@@ -20,3 +20,6 @@ export const workflowRunJsonFields = Object.keys(workflowRunSchema.shape).join("
  * testing it, so it says nothing of the commit. A scheduled run does build the commit the branch is at.
  */
 export const isStartedByVersion = (run: Pick<WorkflowRun, "event">) => run.event !== "dynamic";
+
+export const runUrlOf = (repository: string, run: Pick<WorkflowRun, "databaseId">) =>
+  `https://github.com/${repository}/actions/runs/${run.databaseId}`;

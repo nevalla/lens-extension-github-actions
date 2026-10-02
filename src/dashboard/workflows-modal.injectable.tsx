@@ -13,7 +13,8 @@ import { useInject } from "@k8slens/use-inject";
 import { observer } from "mobx-react";
 import { watchOfKey } from "../watched-repositories/watched-repository";
 import { watchOnClusterInjectable } from "./watch-on-cluster.injectable";
-import { WorkflowRunsView, workflowsTitleOf } from "./workflow-runs-view";
+import { workflowsTitleOf } from "../workflow-runs/version";
+import { WorkflowRunCards } from "./workflow-run-cards";
 import { openWorkflowsTabInjectable } from "./workflows-tab.injectable";
 
 /** A version's workflows and their jobs, over the dashboard. */
@@ -43,7 +44,13 @@ const WorkflowsModal = observer(
           {/* Long matrix builds scroll here rather than outgrowing the window. */}
           <Div $style={{ width: 720, maxWidth: "80vw", maxHeight: "65vh", overflowY: "auto" }}>
             {row ? (
-              <WorkflowRunsView repository={repository} row={row} onRerun={() => void watchState.refresh()} />
+              <WorkflowRunCards
+                repository={repository}
+                row={row}
+                onRerun={() => void watchState.refresh()}
+                place={JSON.stringify(["modal", clusterId, watchKey, versionId])}
+                compact
+              />
             ) : (
               <Span $color="textMuted">This version is no longer among the latest ones.</Span>
             )}
@@ -52,7 +59,11 @@ const WorkflowsModal = observer(
         <ModalFooter>
           <Div $flex={{ direction: "horizontal", gap: "l", verticalAlign: "center" }}>
             {row && (
-              <A onClick={openInTab} $color="link" $tooltip="Keep it open in a tab of its own, next to the dashboard">
+              <A
+                onClick={openInTab}
+                $color="link"
+                $tooltip="Each job's steps and the end of a failed one's log, in a tab of its own"
+              >
                 Open in a tab
               </A>
             )}

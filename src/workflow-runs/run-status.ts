@@ -16,8 +16,15 @@ const success: RunStatus = { label: "Success", color: "success", severity: 1 };
 const cancelled: RunStatus = { label: "Cancelled", color: "grey60", severity: 0 };
 const skipped: RunStatus = { label: "Skipped", color: "grey60", severity: 0 };
 
-/** The status of a workflow run, or of one of its jobs, which reads the same. */
-export const runStatusOf = ({ status, conclusion }: Pick<WorkflowRun, "status" | "conclusion">): RunStatus => {
+/** What a status is read from: a workflow run, one of its jobs or one of their steps, which read the same. */
+interface Ran {
+  readonly status: string;
+  /** None until it has finished, for a job or a step. */
+  readonly conclusion?: string | null;
+}
+
+/** The status of a workflow run, or of one of its jobs or steps. */
+export const runStatusOf = ({ status, conclusion }: Ran): RunStatus => {
   if (status !== "completed") return status === "in_progress" ? inProgress : queued;
 
   switch (conclusion) {
@@ -39,3 +46,7 @@ export const runStatusOf = ({ status, conclusion }: Pick<WorkflowRun, "status" |
 
 export const overallStatusOf = (runs: readonly WorkflowRun[]): RunStatus =>
   runs.map(runStatusOf).reduce((worst, each) => (each.severity > worst.severity ? each : worst));
+
+/** Whether a workflow's card starts open: folded once nothing in it asks for attention. */
+export const opensByDefault = ({ status, conclusion }: Ran) =>
+  !(status === "completed" && (conclusion === "success" || conclusion === "skipped"));

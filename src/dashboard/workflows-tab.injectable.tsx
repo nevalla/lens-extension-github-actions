@@ -16,9 +16,10 @@ import { computed, type ObservableMap, observable, runInAction } from "mobx";
 import { observer } from "mobx-react";
 import { useEffect } from "react";
 import { watchOfKey } from "../watched-repositories/watched-repository";
+import { workflowsTitleOf } from "../workflow-runs/version";
 import { GhProblemNotice } from "./gh-problem-notice";
 import { watchOnClusterInjectable } from "./watch-on-cluster.injectable";
-import { WorkflowRunsView, workflowsTitleOf } from "./workflow-runs-view";
+import { WorkflowRunCards } from "./workflow-run-cards";
 
 /** Which version's workflows a tab shows: the watch on the cluster it belongs to, and the version. */
 export interface WorkflowsTabInput {
@@ -92,7 +93,12 @@ const WorkflowsOfVersion = observer(({ input }: { input: WorkflowsTabInput }) =>
         {repository} · {row ? workflowsTitleOf(row) : input.label}
       </Span>
       {row ? (
-        <WorkflowRunsView repository={repository} row={row} onRerun={() => void watchState.refresh()} detailed />
+        <WorkflowRunCards
+          repository={repository}
+          row={row}
+          onRerun={() => void watchState.refresh()}
+          place={tabIdOf(input)}
+        />
       ) : watchState.activity.status === "loading" ? (
         <Span $color="textMuted">Loading…</Span>
       ) : watchState.activity.status === "failed" ? (

@@ -1,3 +1,4 @@
+import { overallStatusOf } from "./run-status";
 import { isStartedByVersion, type WorkflowRun } from "./workflow-run";
 
 /** One version of what a watch follows: a commit of a branch, or a release. Newest first wherever listed. */
@@ -41,3 +42,20 @@ export const toVersionRuns = (version: Version, newestFirst: readonly WorkflowRu
   runs: newestOfEachWorkflow(newestFirst.filter(isStartedByVersion)),
   otherRuns: newestOfEachWorkflow(newestFirst.filter((run) => !isStartedByVersion(run))),
 });
+
+/** What names a version's workflows: "76cd335", or "v1.2.0 · on main" for runs of the commit it was tagged on. */
+export const workflowsTitleOf = (row: VersionRuns) => `${row.version.label}${row.runsOn ? ` · on ${row.runsOn}` : ""}`;
+
+/** What heads a version's workflows: how many of them passed, and the status that asks most for attention. */
+export const summaryOf = (row: Pick<VersionRuns, "runs">) => {
+  const total = row.runs.length;
+
+  if (total === 0) return { text: "No workflow runs of its own", status: undefined };
+
+  const passed = row.runs.filter((run) => run.conclusion === "success").length;
+
+  return {
+    text: `${passed}/${total} ${total === 1 ? "workflow" : "workflows"} passed`,
+    status: overallStatusOf(row.runs),
+  };
+};
