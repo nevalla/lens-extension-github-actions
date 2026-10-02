@@ -1,7 +1,7 @@
-import { runCliCommandInjectionToken } from "@k8slens/cli-contracts";
 import { getInjectable2 } from "@k8slens/injectable";
 import { z } from "zod";
 import { isReleasesWatch, tagMatches, type WatchedRepository } from "../watched-repositories/watched-repository";
+import { ghInjectable } from "./gh.injectable";
 import { shellQuote } from "./shell-quote";
 import { toVersionRuns, type Version, type VersionRuns } from "./version";
 import { workflowRunJsonFields, workflowRunSchema } from "./workflow-run";
@@ -14,9 +14,6 @@ const releasesAskedForPattern = 100;
 export const versionsWithRuns = 5;
 // Comfortably more than the workflows one commit triggers.
 const runsAskedPerCommit = 30;
-
-// Anything gh writes to standard error fails the command, so keep its notices quiet.
-const ghEnv = { GH_NO_UPDATE_NOTIFIER: "1", GH_PROMPT_DISABLED: "1", NO_COLOR: "1" };
 
 const commitsJq = `[.[] | {sha, title: (.commit.message | split("\\n")[0]), committedAt: .commit.committer.date}]`;
 
@@ -43,11 +40,9 @@ export interface TrackSource {
 
 export const trackSourcesInjectable = getInjectable2({
   id: "github-actions-track-sources",
-  consumptions: [runCliCommandInjectionToken],
 
   instantiate: (di) => {
-    const runCliCommand = di.inject(runCliCommandInjectionToken)();
-    const gh = async (args: string) => runCliCommand(`gh ${args}`, { env: ghEnv });
+    const gh = di.inject(ghInjectable)();
     const ghJson = async (args: string) => JSON.parse(await gh(args));
 
     const runsOfCommit = async (repository: string, sha: string) =>

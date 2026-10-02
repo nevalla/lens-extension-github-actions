@@ -45,6 +45,8 @@
     "@k8slens/input-components": "^1.0.1",
     "@k8slens/kubernetes-contracts": "^2.0.2",
     "@k8slens/main-view-contracts": "^1.3.2",
+    "@k8slens/modal-components": "^1.2.0",
+    "@k8slens/modal-contracts": "^1.0.2",
     "@k8slens/navigation-contracts": "^1.0.0",
     "@k8slens/navigator-components": "^1.0.3",
     "@k8slens/navigator-contracts": "^2.0.2",

@@ -16,20 +16,25 @@ import { formatAge } from "./format-time-ago";
 import { RunStatusIcon } from "./run-status-icon";
 import { ServiceTooltip } from "./service-tooltip";
 import { type DotColor, StatusDot } from "./status-dot";
+import { selectedVersionInjectable } from "./selected-version.injectable";
 import type { VersionRow } from "./watch-on-cluster.injectable";
 import { columnHeader, getWatchRowsBunch, type WatchTableParams } from "./watch-table";
 
 /** A row with what its services are counted in, as the tooltips say it. */
 interface Row extends VersionRow {
   readonly unit: "commit" | "release";
+  readonly clusterId: string;
+  readonly watchKey: string;
 }
 
 export const versionsTableKind = getTableKind<Row, WatchTableParams>("github-actions-versions");
 
-export const versionRowsBunch = getWatchRowsBunch<Row>("version-rows", (watchState, _clusterId, watchKey) => {
+export const versionRowsBunch = getWatchRowsBunch<Row>("version-rows", (watchState, clusterId, watchKey) => {
   const unit = isReleasesWatch(watchOfKey(watchKey)) ? "release" : "commit";
 
-  return watchState.activity.status === "loading" ? undefined : watchState.rows.map((row) => ({ ...row, unit }));
+  return watchState.activity.status === "loading"
+    ? undefined
+    : watchState.rows.map((row) => ({ ...row, unit, clusterId, watchKey }));
 });
 
 export const versionsTable = getTableInjectableBunch({
@@ -74,15 +79,19 @@ const VersionCell = ({ row }: CellProps) => {
 const TitleCell = ({ row }: CellProps) =>
   row.version.title !== row.version.label ? <Span $tooltip={row.version.title}>{row.version.title}</Span> : null;
 
-const ChecksCell = ({ row }: CellProps) =>
-  row.runs.length === 0 ? (
-    <Span $color="textMuted">—</Span>
-  ) : (
-    <Span $tooltip={runsTooltip(row)}>
+// Clicking it shows the version's workflows and their jobs under the table.
+const ChecksCell = ({ row }: CellProps) => {
+  const selected = useInject(selectedVersionInjectable)(row.clusterId, row.watchKey);
+
+  if (row.runs.length === 0) return <Span $color="textMuted">—</Span>;
+
+  return (
+    <A onClick={() => selected.toggle(row.version.id)} $tooltip={runsTooltip(row)} $color="link">
       {row.runs.filter((run) => run.conclusion === "success").length}/{row.runs.length} passed
       {row.runsOn && <Span $color="textMuted"> · on {row.runsOn}</Span>}
-    </Span>
+    </A>
   );
+};
 
 const dotColors: Record<VersionService["state"], DotColor> = {
   running: "success",

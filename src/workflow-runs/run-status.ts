@@ -16,7 +16,8 @@ const success: RunStatus = { label: "Success", color: "success", severity: 1 };
 const cancelled: RunStatus = { label: "Cancelled", color: "grey60", severity: 0 };
 const skipped: RunStatus = { label: "Skipped", color: "grey60", severity: 0 };
 
-export const runStatusOf = ({ status, conclusion }: WorkflowRun): RunStatus => {
+/** The status of a workflow run, or of one of its jobs, which reads the same. */
+export const runStatusOf = ({ status, conclusion }: Pick<WorkflowRun, "status" | "conclusion">): RunStatus => {
   if (status !== "completed") return status === "in_progress" ? inProgress : queued;
 
   switch (conclusion) {
