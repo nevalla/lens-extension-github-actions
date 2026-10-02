@@ -1,9 +1,9 @@
 import type { KubernetesApiVersion } from "@k8slens/kubernetes-contracts";
 import type { Condition } from "./flux-kinds";
 
-/** The Kustomization or HelmRelease that applies something. */
-export interface FluxOwnerRef {
-  readonly kind: "Kustomization" | "HelmRelease";
+/** The Kustomization, HelmRelease or Argo CD Application that applies something. */
+export interface OwnerRef {
+  readonly kind: "Kustomization" | "HelmRelease" | "Application";
   readonly namespace: string;
   readonly name: string;
 }
@@ -15,7 +15,7 @@ export interface Workload {
   readonly images: readonly string[];
   /** Every replica runs the current template. */
   readonly rolledOut: boolean;
-  readonly owner?: FluxOwnerRef;
+  readonly owner?: OwnerRef;
 }
 
 export interface ImageSelection {
@@ -34,12 +34,14 @@ export interface ReleasedChart {
   readonly attempted?: string;
 }
 
-export interface FluxResource extends FluxOwnerRef {
+export interface DeployResource extends OwnerRef {
   /** The version the cluster serves it in, which is what opening its details asks for. */
   readonly apiVersion: KubernetesApiVersion;
   /** For a HelmRelease. */
   readonly chart?: ReleasedChart;
-  /** For a Kustomization: the source it applies, and the commits it applied and tried last. */
+  /** For an Argo CD Application: the repository and branch it deploys, and the commit it compared last. */
+  readonly inlineSource?: GitSource;
+  /** For a Kustomization: the source it applies; for both, the commits it applied and tried last. */
   readonly sourceRef?: { readonly kind: string; readonly namespace: string; readonly name: string };
   readonly appliedCommit?: string;
   readonly attemptedCommit?: string;
@@ -79,13 +81,13 @@ export interface ImageAutomation {
 export interface ClusterImages {
   readonly workloads: readonly Workload[];
   readonly imageSelections: readonly ImageSelection[];
-  readonly fluxResources: readonly FluxResource[];
+  readonly deployResources: readonly DeployResource[];
   readonly imageAutomations: readonly ImageAutomation[];
   readonly helmCharts: readonly HelmChart[];
   readonly gitSources: readonly GitSource[];
 }
 
-export const fluxOwnerOf = (labels: Readonly<Record<string, string>> = {}): FluxOwnerRef | undefined => {
+export const fluxOwnerOf = (labels: Readonly<Record<string, string>> = {}): OwnerRef | undefined => {
   const helmRelease = labels["helm.toolkit.fluxcd.io/name"];
   const kustomization = labels["kustomize.toolkit.fluxcd.io/name"];
 
@@ -102,7 +104,7 @@ export const fluxOwnerOf = (labels: Readonly<Record<string, string>> = {}): Flux
   return undefined;
 };
 
-export const fluxStateOf = (conditions: readonly Condition[] = []): Pick<FluxResource, "state" | "message"> => {
+export const fluxStateOf = (conditions: readonly Condition[] = []): Pick<DeployResource, "state" | "message"> => {
   const ready = conditions.find((condition) => condition.type === "Ready");
   const reconciling = conditions.find((condition) => condition.type === "Reconciling" && condition.status === "True");
 
@@ -114,8 +116,9 @@ export const fluxStateOf = (conditions: readonly Condition[] = []): Pick<FluxRes
   return { state: ready.status === "True" ? "ready" : "failed", message: ready.message };
 };
 
-export const isSameFluxResource = (a: FluxOwnerRef, b: FluxOwnerRef) =>
-  a.kind === b.kind && a.namespace === b.namespace && a.name === b.name;
+// Argo CD's tracking may not say which namespace an Application is in, and then its name alone tells it.
+export const isSameOwner = (a: OwnerRef, b: OwnerRef) =>
+  a.kind === b.kind && a.name === b.name && (a.namespace === b.namespace || !a.namespace || !b.namespace);
 
 const tagOf = (image: string) => {
   const withoutDigest = image.split("@")[0];

@@ -70,9 +70,9 @@ export const dashboardHealthInjectable = getInjectable2({
         if (fluxFailing.length > 0 || syncsFailing.length > 0)
           return {
             state: "failing",
-            message: `Flux fails to apply ${[
+            message: `Failing to apply ${[
               ...fluxFailing.map((service) => service.name),
-              ...syncsFailing.map((sync) => `Kustomization ${sync.kustomization.name}`),
+              ...syncsFailing.map((sync) => `${sync.resource.kind} ${sync.resource.name}`),
             ].join(", ")}.`,
           };
 
@@ -95,7 +95,7 @@ export const dashboardHealthInjectable = getInjectable2({
         if (syncsDeploying.length > 0)
           return {
             state: "deploying",
-            message: `Flux is applying a newer commit with ${plural(syncsDeploying.length, "Kustomization", "Kustomizations")}.`,
+            message: `A newer commit is being applied by ${plural(syncsDeploying.length, "Kustomization or Application", "Kustomizations or Applications")}.`,
           };
 
         const behind = services.filter((service) => (service.running?.behind ?? 0) > 0);
@@ -110,13 +110,12 @@ export const dashboardHealthInjectable = getInjectable2({
         if (syncsBehind.length > 0)
           return {
             state: "behind",
-            message: `${syncsBehind.length} of ${plural(syncs.length, "Kustomization has", "Kustomizations have")} applied an older commit than the latest.`,
+            message: `${syncsBehind.length} of ${plural(syncs.length, "sync has", "syncs have")} applied an older commit than the latest.`,
           };
 
         return {
           state: "up-to-date",
-          message:
-            services.length > 0 ? "Every service runs the latest version." : "Flux has applied the latest commit.",
+          message: services.length > 0 ? "Every service runs the latest version." : "The latest commit is applied.",
         };
       });
   },

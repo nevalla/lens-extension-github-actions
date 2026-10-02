@@ -1,4 +1,4 @@
-import type { FluxSync } from "../deployments/flux-syncs";
+import type { GitOpsSync } from "../deployments/gitops-syncs";
 import type { Service } from "../deployments/services";
 
 /** A service with what its versions are called, which is what "behind" counts in. */
@@ -41,7 +41,7 @@ export type ServiceLook = "failed" | "progressing" | "behind" | "latest";
 
 export const serviceLookOf = (service: Service): ServiceLook => {
   if (
-    service.flux?.state === "failed" ||
+    service.deployer?.state === "failed" ||
     service.pickedUp?.stage === "failed" ||
     service.chart?.pending?.stage === "failed"
   )
@@ -52,10 +52,10 @@ export const serviceLookOf = (service: Service): ServiceLook => {
 };
 
 // A commit older than the versions watched is as far behind as can be told, and maybe more.
-const behindLabel = ({ behind, at }: NonNullable<FluxSync["applied"]>) =>
+const behindLabel = ({ behind, at }: NonNullable<GitOpsSync["applied"]>) =>
   behind === 0 ? "Latest" : `${behind}${at ? "" : "+"} ${behind === 1 && at ? "commit" : "commits"} behind`;
 
-export const syncStatusOf = ({ applied, pending }: FluxSync) => {
+export const syncStatusOf = ({ applied, pending }: GitOpsSync) => {
   switch (pending?.stage) {
     case "fetched":
       return `${pending.label} fetched, not applied yet`;

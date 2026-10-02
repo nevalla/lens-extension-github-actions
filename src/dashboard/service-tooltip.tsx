@@ -6,8 +6,8 @@ const short = (sha: string) => sha.slice(0, 7);
 const stageExplanations = {
   selected: "An ImagePolicy has selected the image; image automation has not committed it yet.",
   committed: "Image automation has pushed to the GitOps repository since; waiting for Flux to apply it.",
-  applying: "The Kustomization or HelmRelease is reconciling.",
-  failed: "The Kustomization or HelmRelease failed to apply.",
+  applying: "What deploys it is applying it.",
+  failed: "What deploys it failed to apply it.",
 } as const;
 
 const chartStageLabels = {
@@ -42,10 +42,10 @@ export const ServiceTooltip = ({ service }: { service: ServiceRow }) => (
           {automation.lastPushCommit ? ` ${short(automation.lastPushCommit)}` : ""}
         </Span>
       ))}
-      {service.flux && (
+      {service.deployer && (
         <Span>
-          {service.flux.kind} {service.flux.namespace}/{service.flux.name}: {service.flux.state}
-          {service.flux.revision ? ` at ${service.flux.revision}` : ""}
+          {service.deployer.kind} {service.deployer.namespace}/{service.deployer.name}: {service.deployer.state}
+          {service.deployer.revision ? ` at ${service.deployer.revision}` : ""}
         </Span>
       )}
       {service.chart && (
@@ -61,6 +61,8 @@ export const ServiceTooltip = ({ service }: { service: ServiceRow }) => (
       )}
     </Div>
 
-    {service.flux?.state === "failed" && service.flux.message && <Span $color="critical">{service.flux.message}</Span>}
+    {service.deployer?.state === "failed" && service.deployer.message && (
+      <Span $color="critical">{service.deployer.message}</Span>
+    )}
   </Div>
 );

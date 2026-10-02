@@ -1,13 +1,13 @@
 import type { Version } from "../workflow-runs/version";
-import type { ClusterImages, FluxResource, GitSource } from "./cluster-images";
+import type { ClusterImages, DeployResource, GitSource } from "./cluster-images";
 import type { VersionOnTrack } from "./services";
 
 /**
- * A Kustomization applying the watched branch: what it applied, and a newer commit on its way, fetched
- * by its GitRepository and not applied yet, being applied, or failed to apply.
+ * A Kustomization or an Argo CD Application applying the watched branch: what it applied, and a newer
+ * commit on its way, fetched and not applied yet, being applied, or failed to apply.
  */
-export interface FluxSync {
-  readonly kustomization: FluxResource;
+export interface GitOpsSync {
+  readonly resource: DeployResource;
   readonly source: GitSource;
   /** The commit applied, short when it is not one of the versions watched. */
   readonly applied?: VersionOnTrack;
@@ -35,8 +35,8 @@ const onTrackOf = (
     : { id: sha, label: versions[behind].label, at: versions[behind].at, behind, url: versions[behind].url };
 };
 
-const pendingOf = (kustomization: FluxResource, source: GitSource) => {
-  const { appliedCommit, attemptedCommit, state } = kustomization;
+const pendingOf = (resource: DeployResource, source: GitSource) => {
+  const { appliedCommit, attemptedCommit, state } = resource;
 
   if (state === "failed") return { commit: attemptedCommit ?? source.commit, stage: "failed" as const };
   if (state === "reconciling") return { commit: source.commit ?? attemptedCommit, stage: "applying" as const };
@@ -45,41 +45,49 @@ const pendingOf = (kustomization: FluxResource, source: GitSource) => {
   return undefined;
 };
 
-/** The Kustomizations applying a repository's branch from a GitRepository of the cluster, most behind first. */
-export const fluxSyncsOf = (
+/**
+ * What applies a repository's branch in the cluster, most behind first: the Kustomizations of a
+ * GitRepository following it, and the Argo CD Applications whose source it is.
+ */
+export const gitOpsSyncsOf = (
   repository: string,
   branch: string,
   versions: readonly Version[],
-  { fluxResources, gitSources }: ClusterImages,
-): FluxSync[] => {
-  const sources = gitSources.filter(
-    (source) => source.repository === repository.toLowerCase() && source.branch === branch,
-  );
+  { deployResources, gitSources }: ClusterImages,
+): GitOpsSync[] => {
+  // An Application following "HEAD" follows the repository's default branch, which is not known here: it is
+  // taken to be the branch watched.
+  const isWatched = (source: GitSource, resource: DeployResource) =>
+    source.repository === repository.toLowerCase() &&
+    (source.branch === branch || (source.branch === undefined && source === resource.inlineSource));
 
-  return fluxResources
-    .flatMap((kustomization): FluxSync[] => {
-      const source = sources.find(
-        (each) =>
-          kustomization.sourceRef?.kind === "GitRepository" &&
-          each.namespace === kustomization.sourceRef.namespace &&
-          each.name === kustomization.sourceRef.name,
-      );
+  // An Application names its source itself; a Kustomization through the GitRepository it refers to.
+  const sourceOf = (resource: DeployResource) =>
+    resource.inlineSource ??
+    gitSources.find(
+      (each) =>
+        resource.sourceRef?.kind === "GitRepository" &&
+        each.namespace === resource.sourceRef.namespace &&
+        each.name === resource.sourceRef.name,
+    );
 
-      if (!source) return [];
+  return deployResources
+    .flatMap((resource): GitOpsSync[] => {
+      const source = sourceOf(resource);
 
-      const pending = pendingOf(kustomization, source);
+      if (!source || !isWatched(source, resource)) return [];
+
+      const pending = pendingOf(resource, source);
       const pendingOnTrack = onTrackOf(pending?.commit, repository, versions);
 
       return [
         {
-          kustomization,
+          resource,
           source,
-          applied: onTrackOf(kustomization.appliedCommit, repository, versions),
+          applied: onTrackOf(resource.appliedCommit, repository, versions),
           // Failing counts even on the applied commit: applying it again is what fails.
           pending:
-            pending &&
-            pendingOnTrack &&
-            (pending.stage === "failed" || pendingOnTrack.id !== kustomization.appliedCommit)
+            pending && pendingOnTrack && (pending.stage === "failed" || pendingOnTrack.id !== resource.appliedCommit)
               ? { ...pendingOnTrack, stage: pending.stage }
               : undefined,
         },
@@ -89,23 +97,23 @@ export const fluxSyncsOf = (
       (a, b) =>
         Number(!!b.pending) - Number(!!a.pending) ||
         (b.applied?.behind ?? 0) - (a.applied?.behind ?? 0) ||
-        a.kustomization.name.localeCompare(b.kustomization.name),
+        a.resource.name.localeCompare(b.resource.name),
     );
 };
 
-/** One Kustomization as it stands for one version. */
+/** One Kustomization or Application as it stands for one version. */
 export interface VersionSync {
   readonly name: string;
   readonly state: "running" | "rolling-out" | "picked-up" | "failed";
-  readonly sync: FluxSync;
+  readonly sync: GitOpsSync;
 }
 
 const pendingStates = { fetched: "picked-up", applying: "rolling-out", failed: "failed" } as const;
 
-/** The Kustomizations that applied, are applying, fetched, or failed to apply one version. */
-export const syncsOfVersion = (id: string, syncs: readonly FluxSync[]): VersionSync[] =>
+/** What applied, is applying, fetched, or failed to apply one version. */
+export const syncsOfVersion = (id: string, syncs: readonly GitOpsSync[]): VersionSync[] =>
   syncs.flatMap((sync): VersionSync[] => {
-    const name = sync.kustomization.name;
+    const name = sync.resource.name;
 
     if (sync.pending?.id === id) return [{ name, state: pendingStates[sync.pending.stage], sync }];
     if (sync.applied?.id === id) return [{ name, state: "running", sync }];

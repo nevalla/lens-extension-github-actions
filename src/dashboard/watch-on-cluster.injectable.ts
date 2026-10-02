@@ -3,7 +3,7 @@ import { computed } from "mobx";
 import { imageIsOfCommit, imageIsOfRelease } from "../deployments/cluster-images";
 import { clusterImagesInjectable } from "../deployments/cluster-images.injectable";
 import { type ImageMatches, type Service, servicesOf, versionsRunningOf } from "../deployments/services";
-import { type FluxSync, fluxSyncsOf, syncsOfVersion, type VersionSync } from "../deployments/flux-syncs";
+import { type GitOpsSync, gitOpsSyncsOf, syncsOfVersion, type VersionSync } from "../deployments/gitops-syncs";
 import { servicesOfVersion, type VersionService } from "../deployments/version-services";
 import { isReleasesWatch, watchOfKey } from "../watched-repositories/watched-repository";
 import { trackActivityInjectable } from "../workflow-runs/track-activity.injectable";
@@ -17,8 +17,8 @@ export interface VersionRow extends VersionRuns {
 
 export interface ServicesSummary {
   readonly services: readonly Service[];
-  /** The Kustomizations applying the watched branch, for a branch the cluster syncs from. */
-  readonly syncs: readonly FluxSync[];
+  /** The Kustomizations and Argo CD Applications applying the watched branch, for a branch the cluster syncs from. */
+  readonly syncs: readonly GitOpsSync[];
   readonly versionsRunning: number;
   readonly onNewest: number;
 }
@@ -49,7 +49,7 @@ export const watchOnClusterInjectable = getInjectable2({
         const services = servicesOf(trackState.versions, matches, clusterState.images);
         const syncs = isReleasesWatch(watch)
           ? []
-          : fluxSyncsOf(watch.repository, watch.branch, trackState.versions, clusterState.images);
+          : gitOpsSyncsOf(watch.repository, watch.branch, trackState.versions, clusterState.images);
 
         return {
           services,
