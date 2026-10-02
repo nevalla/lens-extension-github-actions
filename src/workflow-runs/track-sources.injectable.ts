@@ -157,11 +157,33 @@ export const trackSourcesInjectable = getInjectable2({
         return commit;
       };
 
+      // Asked once: the branch a repository builds on when its releases have no runs of their own.
+      let defaultBranch: Promise<string | undefined> | undefined;
+      const defaultBranchOf = () =>
+        (defaultBranch ??= gh(`repo view ${shellQuote(repository)} --json defaultBranchRef --jq .defaultBranchRef.name`)
+          .then((name) => name.trim() || undefined)
+          .catch(() => {
+            defaultBranch = undefined;
+
+            return undefined;
+          }));
+
       // A release's own name is usually its tag, so what it says is the message of the commit it points to.
+      // Its runs are those its tag started; a repository that builds the commit on its default branch and
+      // tags it afterwards, as release-please does, has none, and then the commit's runs there are shown.
       const releaseRunsOf = async (version: Version) => {
         const commit = await taggedCommitOfRelease(version.id);
+        const tagged = { ...version, title: commit.title };
+        const runs = await runsOfCommit(repository, commit.sha);
+        const own = runs.filter((run) => run.headBranch === version.id);
 
-        return runsOf(repository, version.id, commit.sha, { ...version, title: commit.title });
+        if (own.length > 0 || runs.length === 0) return toVersionRuns(tagged, own);
+
+        const branch = await defaultBranchOf();
+        // A pull request from another branch may run on the same commit.
+        const onBranch = runs.filter((run) => run.headBranch === branch);
+
+        return toVersionRuns(tagged, onBranch, onBranch.length > 0 ? branch : undefined);
       };
 
       return {
