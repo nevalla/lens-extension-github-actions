@@ -1,11 +1,34 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600">
-  <!-- A placeholder: replace it with a banner of the extension's own, twice as wide as it is tall. -->
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#3d90ce"/>
-      <stop offset="1" stop-color="#1e3a5f"/>
+      <stop offset="0" stop-color="#0e2620"/>
+      <stop offset="1" stop-color="#17463a"/>
     </linearGradient>
   </defs>
   <rect width="1200" height="600" fill="url(#background)"/>
-  <text x="600" y="320" text-anchor="middle" font-family="sans-serif" font-size="72" fill="#ffffff">github-actions</text>
+
+  <!-- The icon's mark, large. -->
+  <g transform="translate(150 150) scale(4.2)">
+    <rect width="64" height="64" rx="14" fill="#1f7a5a"/>
+    <path d="M44.9 16.7 A20 20 0 1 1 19.1 16.7" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+    <path d="M24.6 11.2 L22.6 21.9 L13.4 15.4 Z" fill="#ffffff" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M22.5 32.5 L29.5 39.5 L42 26" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <g font-family="Helvetica, Arial, sans-serif">
+    <text x="470" y="250" font-size="64" font-weight="700" fill="#ffffff">GitHub Actions</text>
+    <text x="470" y="305" font-size="30" fill="#b7d9cc">CI runs, and what each cluster</text>
+    <text x="470" y="345" font-size="30" fill="#b7d9cc">deploys of them</text>
+  </g>
+
+  <!-- Commit, CI, cluster: the way a change goes. -->
+  <g transform="translate(470 400)">
+    <line x1="18" y1="22" x2="562" y2="22" stroke="#3f8f74" stroke-width="4"/>
+    <circle cx="18" cy="22" r="14" fill="#0e2620" stroke="#b7d9cc" stroke-width="4"/>
+    <circle cx="200" cy="22" r="14" fill="#0e2620" stroke="#b7d9cc" stroke-width="4"/>
+    <circle cx="382" cy="22" r="18" fill="#2ea36f"/>
+    <path d="M374 22 L380 28 L391 16" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="530" y="0" width="44" height="44" rx="8" fill="#0e2620" stroke="#b7d9cc" stroke-width="4"/>
+    <path d="M552 12 L562 18 L562 30 L552 36 L542 30 L542 18 Z" fill="none" stroke="#b7d9cc" stroke-width="3" stroke-linejoin="round"/>
+  </g>
 </svg>

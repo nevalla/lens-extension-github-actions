@@ -1,5 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- A placeholder: replace it with an icon of the extension's own, square, an SVG. -->
-  <rect width="64" height="64" rx="14" fill="#3d90ce"/>
-  <path fill="#ffffff" d="M26 14a6 6 0 0 1 12 0v4h8a4 4 0 0 1 4 4v8h-4a6 6 0 0 0 0 12h4v8a4 4 0 0 1-4 4h-8v-4a6 6 0 0 0-12 0v4h-8a4 4 0 0 1-4-4v-8h4a6 6 0 0 0 0-12h-4v-8a4 4 0 0 1 4-4h8z"/>
+  <!-- A run going round to a check: CI and the deployment it leads to. -->
+  <rect width="64" height="64" rx="14" fill="#1f7a5a"/>
+  <path d="M44.9 16.7 A20 20 0 1 1 19.1 16.7" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+  <path d="M24.6 11.2 L22.6 21.9 L13.4 15.4 Z" fill="#ffffff" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M22.5 32.5 L29.5 39.5 L42 26" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
