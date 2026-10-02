@@ -2,7 +2,7 @@
 
 Keep an eye on the GitHub Actions workflow runs behind each of your clusters, without leaving Lens.
 
-![A cluster's dashboard, following a repository applied by Argo CD](assets/dashboard.png)
+![A cluster's dashboard: a service one release behind the latest, and the workflows of each release](assets/dashboard.png)
 
 ## Features
 
