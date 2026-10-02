@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { syncStatusOf } from "../src/dashboard/flux-stage";
-import { fluxSyncsOf, syncsOfVersion } from "../src/deployments/flux-syncs";
+import { gitOpsSyncsOf, syncsOfVersion } from "../src/deployments/gitops-syncs";
 import { cluster, commit, gitSource, kustomization, sha } from "./fixtures";
 
 const commits = [commit("aaaaaaa"), commit("bbbbbbb"), commit("ccccccc")];
 
-describe("fluxSyncsOf", () => {
+describe("gitOpsSyncsOf", () => {
   it("finds the Kustomizations applying the watched repository and branch only", () => {
-    const syncs = fluxSyncsOf(
+    const syncs = gitOpsSyncsOf(
       "O/GitOps",
       "main",
       commits,
       cluster({
-        fluxResources: [
+        deployResources: [
           kustomization("apps", { appliedCommit: sha("aaaaaaa") }),
           kustomization("platform", { appliedCommit: sha("aaaaaaa") }),
           kustomization("other-branch", { appliedCommit: sha("aaaaaaa") }),
@@ -25,7 +25,7 @@ describe("fluxSyncsOf", () => {
       }),
     );
 
-    expect(syncs.map((sync) => sync.kustomization.name)).toEqual(["apps"]);
+    expect(syncs.map((sync) => sync.resource.name)).toEqual(["apps"]);
   });
 
   it.each([
@@ -61,12 +61,12 @@ describe("fluxSyncsOf", () => {
     ["never applied", {}, sha("aaaaaaa"), "aaaaaaa fetched, not applied yet"],
     ["never applied, nothing fetched yet", {}, undefined, "Not applied yet"],
   ])("%s", (_, overrides, sourceCommit, status) => {
-    const [sync] = fluxSyncsOf(
+    const [sync] = gitOpsSyncsOf(
       "o/gitops",
       "main",
       commits,
       cluster({
-        fluxResources: [kustomization("apps", overrides)],
+        deployResources: [kustomization("apps", overrides)],
         gitSources: [gitSource("apps", { commit: sourceCommit })],
       }),
     );
@@ -75,12 +75,12 @@ describe("fluxSyncsOf", () => {
   });
 
   it("links a commit older than those watched to its page", () => {
-    const [sync] = fluxSyncsOf(
+    const [sync] = gitOpsSyncsOf(
       "o/gitops",
       "main",
       commits,
       cluster({
-        fluxResources: [kustomization("apps", { appliedCommit: sha("fffffff") })],
+        deployResources: [kustomization("apps", { appliedCommit: sha("fffffff") })],
         gitSources: [gitSource("apps", { commit: sha("fffffff") })],
       }),
     );
@@ -89,12 +89,12 @@ describe("fluxSyncsOf", () => {
   });
 
   it("lists what is unsettled first", () => {
-    const syncs = fluxSyncsOf(
+    const syncs = gitOpsSyncsOf(
       "o/gitops",
       "main",
       commits,
       cluster({
-        fluxResources: [
+        deployResources: [
           kustomization("settled", { appliedCommit: sha("aaaaaaa") }),
           kustomization("failing", { appliedCommit: sha("bbbbbbb"), state: "failed", attemptedCommit: sha("aaaaaaa") }),
         ],
@@ -105,18 +105,18 @@ describe("fluxSyncsOf", () => {
       }),
     );
 
-    expect(syncs.map((sync) => sync.kustomization.name)).toEqual(["failing", "settled"]);
+    expect(syncs.map((sync) => sync.resource.name)).toEqual(["failing", "settled"]);
   });
 });
 
 describe("syncsOfVersion", () => {
   it("puts each Kustomization under the commit it applied, or the one on its way", () => {
-    const syncs = fluxSyncsOf(
+    const syncs = gitOpsSyncsOf(
       "o/gitops",
       "main",
       commits,
       cluster({
-        fluxResources: [
+        deployResources: [
           kustomization("settled", { appliedCommit: sha("aaaaaaa") }),
           kustomization("behind", { appliedCommit: sha("bbbbbbb") }),
           kustomization("applying", { appliedCommit: sha("ccccccc"), state: "reconciling" }),

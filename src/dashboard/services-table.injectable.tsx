@@ -8,14 +8,14 @@ import {
 } from "@k8slens/table-contracts";
 import { useInject } from "@k8slens/use-inject";
 import type { ReactNode } from "react";
-import type { FluxResource, Workload } from "../deployments/cluster-images";
+import type { DeployResource, Workload } from "../deployments/cluster-images";
 import { openResourceDetailsInjectable } from "../deployments/open-resource-details.injectable";
 import { openVersionInjectable } from "../workflow-runs/open-version.injectable";
 import { isReleasesWatch, watchOfKey } from "../watched-repositories/watched-repository";
 import { type ServiceRow, serviceLookOf, serviceStatusOf } from "./flux-stage";
 import { columnHeader, getWatchRowsBunch, type WatchTableParams } from "./watch-table";
 import { ServiceTooltip } from "./service-tooltip";
-import { FluxResourceIcon } from "./flux-resource-icon";
+import { DeployerIcon } from "./deployer-icon";
 
 /** A service with the cluster it runs in, which is what opening its details asks for. */
 interface Row extends ServiceRow {
@@ -57,14 +57,14 @@ const StatusIcon = ({ row }: CellProps) => {
   }
 };
 
-/** A link that opens a workload's or a Flux resource's details in the cluster's view. */
+/** A link that opens a workload's, or what deploys it, details in the cluster's view. */
 const DetailsLink = ({
   clusterId,
   resource,
   children,
 }: {
   clusterId: string;
-  resource: Workload | FluxResource;
+  resource: Workload | DeployResource;
   children: ReactNode;
 }) => {
   const openResourceDetails = useInject(openResourceDetailsInjectable)();
@@ -113,15 +113,15 @@ const StateCell = ({ row }: CellProps) => (
   <Span $color={serviceLookOf(row) === "failed" ? "critical" : undefined}>{serviceStatusOf(row)}</Span>
 );
 
-const FluxCell = ({ row }: CellProps) =>
-  row.flux ? (
+const DeployerCell = ({ row }: CellProps) =>
+  row.deployer ? (
     <Div
       $flex={{ direction: "horizontal", gap: "xs", verticalAlign: "center" }}
-      $tooltip={row.flux.message ?? `${row.flux.kind} ${row.flux.namespace}/${row.flux.name}`}
+      $tooltip={row.deployer.message ?? `${row.deployer.kind} ${row.deployer.namespace}/${row.deployer.name}`}
     >
-      <FluxResourceIcon state={row.flux.state} />
-      <DetailsLink clusterId={row.clusterId} resource={row.flux}>
-        {row.flux.kind} {row.flux.name}
+      <DeployerIcon state={row.deployer.state} />
+      <DetailsLink clusterId={row.clusterId} resource={row.deployer}>
+        {row.deployer.kind} {row.deployer.name}
       </DetailsLink>
       {row.chart?.applied && <Span $color="textMuted">· chart {row.chart.applied}</Span>}
     </Div>
@@ -147,17 +147,22 @@ const columns = [
   ["service-name", NameCell, columnHeader("Service")],
   ["service-commit", VersionCell, columnHeader("Version")],
   ["service-state", StateCell, columnHeader("Status")],
-  ["service-flux", FluxCell, columnHeader("Flux")],
+  ["service-flux", DeployerCell, columnHeader("Deployed by")],
   ["service-workloads", WorkloadsCell, columnHeader("Workloads")],
 ] as const;
 
-export const [serviceNameColumn, serviceVersionColumn, serviceStateColumn, serviceFluxColumn, serviceWorkloadsColumn] =
-  columns.map(([id, Cell, Header], index) =>
-    getTableColumnInjectableBunch({
-      id: `github-actions-${id}`,
-      kind: servicesTableKind,
-      orderNumber: (index + 1) * 10,
-      Cell,
-      Header,
-    }),
-  );
+export const [
+  serviceNameColumn,
+  serviceVersionColumn,
+  serviceStateColumn,
+  serviceDeployerColumn,
+  serviceWorkloadsColumn,
+] = columns.map(([id, Cell, Header], index) =>
+  getTableColumnInjectableBunch({
+    id: `github-actions-${id}`,
+    kind: servicesTableKind,
+    orderNumber: (index + 1) * 10,
+    Cell,
+    Header,
+  }),
+);

@@ -73,7 +73,7 @@ describe("servicesOf", () => {
           workloads: [workload("backend", "r/backend:main-bbbbbbb", { owner })],
           imageSelections: [{ namespace: "flux-system", name: "backend", image: "r/backend:main-aaaaaaa" }],
           imageAutomations: [{ namespace: "flux-system", name: "flux-system", lastPushTime: overrides.pushedAt }],
-          fluxResources: [helmRelease("backend", { state: overrides.fluxState ?? "ready" })],
+          deployResources: [helmRelease("backend", { state: overrides.fluxState ?? "ready" })],
         }),
       )[0];
 
@@ -134,7 +134,7 @@ describe("servicesOf", () => {
         byCommit,
         cluster({
           workloads: [workload("backend", "r/backend:main-aaaaaaa", { owner })],
-          fluxResources: [
+          deployResources: [
             helmRelease("backend", {
               state: chart.fluxState ?? "ready",
               chart: {

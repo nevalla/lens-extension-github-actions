@@ -1,4 +1,4 @@
-import type { ClusterImages, FluxResource, GitSource, HelmChart, Workload } from "../src/deployments/cluster-images";
+import type { ClusterImages, DeployResource, GitSource, HelmChart, Workload } from "../src/deployments/cluster-images";
 import type { Version } from "../src/workflow-runs/version";
 import type { WorkflowRun } from "../src/workflow-runs/workflow-run";
 
@@ -29,7 +29,7 @@ export const workload = (name: string, image: string, overrides: Partial<Workloa
   ...overrides,
 });
 
-export const helmRelease = (name: string, overrides: Partial<FluxResource> = {}): FluxResource => ({
+export const helmRelease = (name: string, overrides: Partial<DeployResource> = {}): DeployResource => ({
   kind: "HelmRelease",
   apiVersion: "helm.toolkit.fluxcd.io/v2" as never,
   namespace: "apps",
@@ -38,7 +38,7 @@ export const helmRelease = (name: string, overrides: Partial<FluxResource> = {})
   ...overrides,
 });
 
-export const kustomization = (name: string, overrides: Partial<FluxResource> = {}): FluxResource => ({
+export const kustomization = (name: string, overrides: Partial<DeployResource> = {}): DeployResource => ({
   kind: "Kustomization",
   apiVersion: "kustomize.toolkit.fluxcd.io/v1" as never,
   namespace: "flux-system",
@@ -65,7 +65,7 @@ export const helmChart = (name: string, overrides: Partial<HelmChart> = {}): Hel
 export const cluster = (overrides: Partial<ClusterImages> = {}): ClusterImages => ({
   workloads: [],
   imageSelections: [],
-  fluxResources: [],
+  deployResources: [],
   imageAutomations: [],
   helmCharts: [],
   gitSources: [],

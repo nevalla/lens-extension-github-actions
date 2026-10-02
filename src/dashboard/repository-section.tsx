@@ -13,7 +13,7 @@ import {
 import { clusterRetrySeconds } from "../deployments/cluster-images.injectable";
 import { liveCheckSeconds } from "../workflow-runs/track-activity.injectable";
 import { versionsAsked, versionsWithRuns } from "../workflow-runs/track-sources.injectable";
-import { fluxSyncsTableKind } from "./flux-syncs-table.injectable";
+import { gitOpsSyncsTableKind } from "./gitops-syncs-table.injectable";
 import { Panel } from "./panel";
 import { servicesTableKind } from "./services-table.injectable";
 import { StatCard } from "./stat-card";
@@ -36,7 +36,7 @@ export const RepositorySection = observer(({ clusterId, watch }: { clusterId: st
   const releases = isReleasesWatch(watch);
   const unit = releases ? "release" : "commit";
   const syncs = summary?.syncs ?? [];
-  // A repository the cluster runs no images of, but applies with Flux: a GitOps repository.
+  // A repository the cluster runs no images of, but applies with Flux or Argo CD: a GitOps repository.
   const gitOpsOnly = !!summary && summary.services.length === 0 && syncs.length > 0;
   const passing = rows.filter((row) => row.runs.length > 0 && row.runs.every((run) => run.conclusion === "success"));
 
@@ -78,7 +78,7 @@ export const RepositorySection = observer(({ clusterId, watch }: { clusterId: st
         {gitOpsOnly ? (
           <StatCard
             icon={<CheckCircleIcon $size="m" />}
-            title="Kustomizations"
+            title="Syncs"
             value={`${syncs.filter((sync) => sync.applied?.behind === 0 && !sync.pending).length}/${syncs.length}`}
             label="on the latest commit"
           />
@@ -117,9 +117,12 @@ export const RepositorySection = observer(({ clusterId, watch }: { clusterId: st
       </Panel>
 
       {syncs.length > 0 && (
-        <Panel heading={`Flux syncs (${syncs.length})`} aside="Kustomizations applying this branch">
+        <Panel
+          heading={`GitOps syncs (${syncs.length})`}
+          aside="Kustomizations and Argo CD Applications applying this branch"
+        >
           <Div $style={tableHeight(syncs.length)}>
-            <Table kind={fluxSyncsTableKind} params={params} />
+            <Table kind={gitOpsSyncsTableKind} params={params} />
           </Div>
         </Panel>
       )}

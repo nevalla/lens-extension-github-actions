@@ -11,7 +11,7 @@ import type { Subscribable } from "@k8slens/subscribable";
 import { computed, type IComputedValue, observable, runInAction } from "mobx";
 import {
   type ClusterImages,
-  type FluxResource,
+  type DeployResource,
   fluxOwnerOf,
   type GitSource,
   type HelmChart,
@@ -20,6 +20,7 @@ import {
   type ImageSelection,
   type Workload,
 } from "./cluster-images";
+import { applicationKind, applicationResourceOf, argoOwnerOf, argoprojV1alpha1 } from "./argo-kinds";
 import {
   commitOfRevision,
   gitRepositoryKind,
@@ -77,7 +78,7 @@ export const clusterImagesInjectable = getInjectable2({
         | {
             workloads: Source<Workload>[];
             imageSelections: Source<ImageSelection>;
-            fluxResources: Source<FluxResource>[];
+            deployResources: Source<DeployResource>[];
             imageAutomations: Source<ImageAutomation>;
             helmCharts: Source<HelmChart>;
             gitSources: Source<GitSource>;
@@ -115,10 +116,25 @@ export const clusterImagesInjectable = getInjectable2({
           .reduce((previous, attempt) => previous.catch(attempt), Promise.reject<Source<R>>(new Error("not served")))
           .catch(() => none<R>());
 
+      // Flux labels what it applies; Argo CD tracks it by an annotation, or by a label in its older default.
+      const ownerOfWorkload = (
+        metadata: { labels?: Record<string, string>; annotations?: Record<string, string> },
+        templateLabels?: Record<string, string>,
+      ) => {
+        const labels = { ...templateLabels, ...metadata.labels };
+
+        return fluxOwnerOf(labels) ?? argoOwnerOf(labels, metadata.annotations);
+      };
+
       const workloadOf =
         (kind: Workload["kind"], rolledOutOf: (resource: any) => boolean) =>
         (resource: {
-          metadata: { namespace: string; name: string; labels?: Record<string, string> };
+          metadata: {
+            namespace: string;
+            name: string;
+            labels?: Record<string, string>;
+            annotations?: Record<string, string>;
+          };
           spec: { template?: Template };
         }): Workload[] => [
           {
@@ -127,12 +143,12 @@ export const clusterImagesInjectable = getInjectable2({
             name: resource.metadata.name,
             images: imagesOf(resource.spec.template),
             rolledOut: rolledOutOf(resource),
-            owner: fluxOwnerOf({ ...resource.spec.template?.metadata?.labels, ...resource.metadata.labels }),
+            owner: ownerOfWorkload(resource.metadata, resource.spec.template?.metadata?.labels),
           },
         ];
 
       const fluxResourceOf =
-        (kind: FluxResource["kind"], apiVersion: FluxResource["apiVersion"]) =>
+        (kind: DeployResource["kind"], apiVersion: DeployResource["apiVersion"]) =>
         (resource: {
           metadata: { namespace: string; name: string };
           spec?: { sourceRef?: { kind: string; name: string; namespace?: string } };
@@ -143,7 +159,7 @@ export const clusterImagesInjectable = getInjectable2({
             helmChart?: string;
             history?: readonly { chartVersion?: string; status?: string }[];
           };
-        }): FluxResource[] => {
+        }): DeployResource[] => {
           const status = resource.status ?? {};
 
           return [
@@ -245,6 +261,7 @@ export const clusterImagesInjectable = getInjectable2({
             imageAutomations,
             helmCharts,
             gitSources,
+            applications,
           ] = await Promise.all([
             follow(
               kubeResources(deploymentKind, appsV1, clusterId),
@@ -313,6 +330,12 @@ export const clusterImagesInjectable = getInjectable2({
               () => follow(kubeResources(gitRepositoryKind, sourceToolkitV1, clusterId), gitSourceOf),
               () => follow(kubeResources(gitRepositoryKind, sourceToolkitV1beta2, clusterId), gitSourceOf),
             ),
+            // Argo CD is optional like Flux.
+            followOptional(() =>
+              follow(kubeResources(applicationKind, argoprojV1alpha1, clusterId), (application) => [
+                applicationResourceOf(application),
+              ]),
+            ),
           ]);
 
           if (startedFor !== generation) return;
@@ -322,7 +345,7 @@ export const clusterImagesInjectable = getInjectable2({
             sources.set({
               workloads: [deployments, statefulSets, daemonSets],
               imageSelections,
-              fluxResources: [kustomizations, helmReleases],
+              deployResources: [kustomizations, helmReleases, applications],
               imageAutomations,
               helmCharts,
               gitSources,
@@ -355,7 +378,7 @@ export const clusterImagesInjectable = getInjectable2({
           images: {
             workloads: loaded.workloads.flatMap((source) => source.get()),
             imageSelections: loaded.imageSelections.get(),
-            fluxResources: loaded.fluxResources.flatMap((source) => source.get()),
+            deployResources: loaded.deployResources.flatMap((source) => source.get()),
             imageAutomations: loaded.imageAutomations.get(),
             helmCharts: loaded.helmCharts.get(),
             gitSources: loaded.gitSources.get(),

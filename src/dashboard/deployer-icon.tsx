@@ -1,7 +1,7 @@
 import { CheckCircleIcon, ErrorIcon, ScheduleIcon } from "@k8slens/icon";
-import type { FluxResource } from "../deployments/cluster-images";
+import type { DeployResource } from "../deployments/cluster-images";
 
-export const FluxResourceIcon = ({ state }: { state: FluxResource["state"] }) => {
+export const DeployerIcon = ({ state }: { state: DeployResource["state"] }) => {
   switch (state) {
     case "ready":
       return <CheckCircleIcon $size="s" $color="success" />;

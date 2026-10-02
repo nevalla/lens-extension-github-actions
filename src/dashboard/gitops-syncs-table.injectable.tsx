@@ -7,29 +7,31 @@ import {
   type TableColumnCellProps,
 } from "@k8slens/table-contracts";
 import { useInject } from "@k8slens/use-inject";
-import type { FluxSync } from "../deployments/flux-syncs";
+import type { GitOpsSync } from "../deployments/gitops-syncs";
 import { openResourceDetailsInjectable } from "../deployments/open-resource-details.injectable";
 import { openVersionInjectable } from "../workflow-runs/open-version.injectable";
 import { syncStatusOf } from "./flux-stage";
 import { columnHeader, getWatchRowsBunch, type WatchTableParams } from "./watch-table";
 
-/** A Kustomization with the cluster it is in, which is what opening its details asks for. */
-interface Row extends FluxSync {
+/** A Kustomization or Application with the cluster it is in, which is what opening its details asks for. */
+interface Row extends GitOpsSync {
   readonly clusterId: string;
 }
 
-export const fluxSyncsTableKind = getTableKind<Row, WatchTableParams>("github-actions-flux-syncs");
+// The ids keep their first names: Lens keeps the table's column settings by them.
+export const gitOpsSyncsTableKind = getTableKind<Row, WatchTableParams>("github-actions-flux-syncs");
 
-export const fluxSyncsBunch = getWatchRowsBunch<Row>("flux-syncs", (watchState, clusterId) =>
+export const gitOpsSyncsBunch = getWatchRowsBunch<Row>("gitops-syncs", (watchState, clusterId) =>
   watchState.summary?.syncs.map((sync) => ({ ...sync, clusterId })),
 );
 
-export const fluxSyncsTable = getTableInjectableBunch({
-  kind: fluxSyncsTableKind,
-  getRowId: (row) => `${row.kustomization.namespace}/${row.kustomization.name}`,
+export const gitOpsSyncsTable = getTableInjectableBunch({
+  kind: gitOpsSyncsTableKind,
+  // A Kustomization and an Application can share a namespace and a name.
+  getRowId: (row) => `${row.resource.kind}/${row.resource.namespace}/${row.resource.name}`,
   data: {
     instantiate: (di) => {
-      const syncsOf = di.inject(fluxSyncsBunch.subscribable);
+      const syncsOf = di.inject(gitOpsSyncsBunch.subscribable);
 
       return (...params) => syncsOf(...params);
     },
@@ -56,8 +58,8 @@ const NameCell = ({ row }: CellProps) => {
   return (
     <Div $flex={{ direction: "horizontal", gap: "s", verticalAlign: "center" }}>
       <StatusIcon row={row} />
-      <A onClick={() => void openResourceDetails(row.clusterId, row.kustomization)} $color="link">
-        {row.kustomization.name}
+      <A onClick={() => void openResourceDetails(row.clusterId, row.resource)} $color="link">
+        {row.resource.name}
       </A>
     </Div>
   );
@@ -78,32 +80,35 @@ const AppliedCell = ({ row }: CellProps) => {
 const StatusCell = ({ row }: CellProps) => (
   <Span
     $color={row.pending?.stage === "failed" ? "critical" : undefined}
-    $tooltip={row.pending?.stage === "failed" ? row.kustomization.message : undefined}
+    $tooltip={row.pending?.stage === "failed" ? row.resource.message : undefined}
   >
     {syncStatusOf(row)}
   </Span>
 );
 
+// A Kustomization applies a GitRepository of its own; an Application fetches its source itself.
 const SourceCell = ({ row }: CellProps) => (
   <Span $color="textMuted">
-    GitRepository {row.source.namespace}/{row.source.name}
+    {row.resource.kind === "Application"
+      ? `Argo CD Application ${row.resource.namespace}/${row.resource.name}`
+      : `GitRepository ${row.source.namespace}/${row.source.name}`}
   </Span>
 );
 
 const columns = [
-  ["name", NameCell, columnHeader("Kustomization")],
+  ["name", NameCell, columnHeader("Applied by")],
   ["applied", AppliedCell, columnHeader("Applied")],
   ["status", StatusCell, columnHeader("Status")],
   ["source", SourceCell, columnHeader("Source")],
 ] as const;
 
-export const [fluxSyncNameColumn, fluxSyncAppliedColumn, fluxSyncStatusColumn, fluxSyncSourceColumn] = columns.map(
-  ([id, Cell, Header], index) =>
+export const [gitOpsSyncNameColumn, gitOpsSyncAppliedColumn, gitOpsSyncStatusColumn, gitOpsSyncSourceColumn] =
+  columns.map(([id, Cell, Header], index) =>
     getTableColumnInjectableBunch({
       id: `github-actions-flux-sync-${id}`,
-      kind: fluxSyncsTableKind,
+      kind: gitOpsSyncsTableKind,
       orderNumber: (index + 1) * 10,
       Cell,
       Header,
     }),
-);
+  );

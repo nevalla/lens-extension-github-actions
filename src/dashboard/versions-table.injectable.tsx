@@ -6,7 +6,7 @@ import {
   type TableColumnCellProps,
 } from "@k8slens/table-contracts";
 import { useInject } from "@k8slens/use-inject";
-import type { VersionSync } from "../deployments/flux-syncs";
+import type { VersionSync } from "../deployments/gitops-syncs";
 import type { VersionService } from "../deployments/version-services";
 import { isReleasesWatch, watchOfKey } from "../watched-repositories/watched-repository";
 import { openVersionInjectable } from "../workflow-runs/open-version.injectable";
@@ -93,7 +93,7 @@ const serviceStateLabels: Record<VersionService["state"], string> = {
   running: "running",
   "rolling-out": "rolling out",
   "picked-up": "picked up by Flux",
-  failed: "Flux failed to apply",
+  failed: "failed to apply",
 };
 
 const syncStateLabels: Record<VersionSync["state"], string> = {
@@ -103,7 +103,7 @@ const syncStateLabels: Record<VersionSync["state"], string> = {
   failed: "failed to apply",
 };
 
-/** A service or a Kustomization in the cell, with what its dot means. */
+/** A service, a Kustomization or an Application in the cell, with what its dot means. */
 interface Entry {
   readonly name: string;
   readonly state: VersionService["state"];
@@ -112,7 +112,11 @@ interface Entry {
 
 const entriesOf = (row: Row): Entry[] => [
   ...(row.services ?? []).map(({ name, state }) => ({ name, state, label: serviceStateLabels[state] })),
-  ...(row.syncs ?? []).map(({ name, state }) => ({ name, state, label: `Kustomization ${syncStateLabels[state]}` })),
+  ...(row.syncs ?? []).map(({ name, state, sync }) => ({
+    name,
+    state,
+    label: `${sync.resource.kind} ${syncStateLabels[state]}`,
+  })),
 ];
 
 const EntryDot = ({ entry }: { entry: Entry }) => (
@@ -133,7 +137,7 @@ const EntriesTooltip = ({ entries }: { entries: readonly Entry[] }) => (
   </Div>
 );
 
-// One line, as every row of a table is: the first service or Kustomization, and how many more, all of them on hover.
+// One line, as every row of a table is: the first service, Kustomization or Application, and how many more, all of them on hover.
 const InClusterCell = ({ row }: CellProps) => {
   const entries = entriesOf(row);
   const [first, ...others] = entries;

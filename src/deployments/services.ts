@@ -1,12 +1,12 @@
 import type { Version } from "../workflow-runs/version";
 import {
   type ClusterImages,
-  type FluxResource,
+  type DeployResource,
   type HelmChart,
   type ImageAutomation,
   type ImageSelection,
   imageNameOf,
-  isSameFluxResource,
+  isSameOwner,
   type Workload,
 } from "./cluster-images";
 
@@ -49,8 +49,8 @@ export interface Service {
   readonly running?: VersionOnTrack;
   readonly rollingOut: boolean;
   readonly workloads: readonly Workload[];
-  /** The Kustomization or HelmRelease that applies its workloads. */
-  readonly flux?: FluxResource;
+  /** The Kustomization, HelmRelease or Argo CD Application that applies its workloads. */
+  readonly deployer?: DeployResource;
   /** For a service a HelmRelease applies. */
   readonly chart?: ServiceChart;
   /** A version newer than the running one that Flux image automation has selected, and how far Flux has got with it. */
@@ -75,10 +75,10 @@ const versionOnTrackOf = (
   return { id, label, at, url, behind };
 };
 
-const fluxOf = (workloads: readonly Workload[], fluxResources: readonly FluxResource[]) =>
+const deployerOf = (workloads: readonly Workload[], deployResources: readonly DeployResource[]) =>
   workloads
     .flatMap((workload) => (workload.owner ? [workload.owner] : []))
-    .map((owner) => fluxResources.find((resource) => isSameFluxResource(resource, owner)))
+    .map((owner) => deployResources.find((resource) => isSameOwner(resource, owner)))
     .find((resource) => resource !== undefined);
 
 /**
@@ -98,7 +98,7 @@ const pushesAfter = (
   );
 };
 
-const stageOf = (pushes: readonly ImageAutomation[], flux?: FluxResource): FluxStage => {
+const stageOf = (pushes: readonly ImageAutomation[], flux?: DeployResource): FluxStage => {
   if (flux?.state === "failed") return "failed";
   if (pushes.length === 0) return "selected";
 
@@ -106,13 +106,13 @@ const stageOf = (pushes: readonly ImageAutomation[], flux?: FluxResource): FluxS
 };
 
 const chartOf = (
-  flux: FluxResource | undefined,
+  deployer: DeployResource | undefined,
   helmCharts: readonly HelmChart[],
   versions: readonly Version[],
 ): ServiceChart | undefined => {
-  if (!flux?.chart) return undefined;
+  if (!deployer?.chart) return undefined;
 
-  const { helmChart: helmChartRef, applied, attempted } = flux.chart;
+  const { helmChart: helmChartRef, applied, attempted } = deployer.chart;
   const helmChart = helmCharts.find((chart) => `${chart.namespace}/${chart.name}` === helmChartRef);
   // What Flux has built and not installed yet, or what it tried to install and could not.
   const newer = [helmChart?.version, attempted].find((version) => version && version !== applied);
@@ -123,7 +123,7 @@ const chartOf = (
     pending: newer
       ? {
           version: newer,
-          stage: flux.state === "failed" ? "failed" : flux.state === "reconciling" ? "upgrading" : "waiting",
+          stage: deployer.state === "failed" ? "failed" : deployer.state === "reconciling" ? "upgrading" : "waiting",
         }
       : undefined,
     sourceCommit: helmChart?.sourceCommit,
@@ -144,7 +144,7 @@ const chartOf = (
 export const servicesOf = (
   versions: readonly Version[],
   matches: ImageMatches,
-  { workloads, imageSelections, fluxResources, imageAutomations, helmCharts }: ClusterImages,
+  { workloads, imageSelections, deployResources, imageAutomations, helmCharts }: ClusterImages,
 ) => {
   const services = new Map<
     string,
@@ -179,7 +179,7 @@ export const servicesOf = (
 
   return [...services]
     .map(([name, { running, workloads, selected, imageSelections }]): Service => {
-      const flux = fluxOf(workloads, fluxResources);
+      const deployer = deployerOf(workloads, deployResources);
       const newer = selected && (!running || selected.behind < running.behind) ? selected : undefined;
       const newerVersion = newer && versions[newer.behind];
       const selecting = newerVersion ? imageSelections.filter((each) => matches(each.image, newerVersion)) : [];
@@ -190,11 +190,11 @@ export const servicesOf = (
         running,
         rollingOut: workloads.some((workload) => !workload.rolledOut),
         workloads,
-        flux,
-        chart: chartOf(flux, helmCharts, versions),
+        deployer,
+        chart: chartOf(deployer, helmCharts, versions),
         pickedUp: newer && {
           ...newer,
-          stage: stageOf(pushes, flux),
+          stage: stageOf(pushes, deployer),
           imageSelections: selecting,
           imageAutomations: pushes,
         },
