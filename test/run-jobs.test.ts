@@ -47,6 +47,7 @@ describe("runJobsInjectable", () => {
   afterEach(() => vi.useRealTimers());
 
   const job = (status: string) => ({
+    databaseId: 1,
     name: "build",
     status,
     conclusion: status === "completed" ? "success" : null,

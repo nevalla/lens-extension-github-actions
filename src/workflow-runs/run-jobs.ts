@@ -1,8 +1,18 @@
 import { z } from "zod";
 
-const stepSchema = z.object({ name: z.string(), status: z.string(), conclusion: z.string().nullish() });
+const stepSchema = z.object({
+  name: z.string(),
+  status: z.string(),
+  conclusion: z.string().nullish(),
+  number: z.number().nullish(),
+  startedAt: z.string().nullish(),
+  completedAt: z.string().nullish(),
+});
+
+export type RunStep = z.infer<typeof stepSchema>;
 
 export const runJobSchema = z.object({
+  databaseId: z.number(),
   name: z.string(),
   status: z.string(),
   conclusion: z.string().nullish(),
@@ -39,3 +49,6 @@ export const failedStepOf = ({ steps }: Pick<RunJob, "steps">) =>
   steps?.find((step) => step.conclusion === "failure")?.name;
 
 export const isFinished = (job: Pick<RunJob, "status">) => job.status === "completed";
+
+export const isFailed = (job: Pick<RunJob, "status" | "conclusion">) =>
+  isFinished(job) && (job.conclusion === "failure" || job.conclusion === "timed_out");

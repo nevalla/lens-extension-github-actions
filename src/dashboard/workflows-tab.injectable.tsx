@@ -92,7 +92,7 @@ const WorkflowsOfVersion = observer(({ input }: { input: WorkflowsTabInput }) =>
         {repository} · {row ? workflowsTitleOf(row) : input.label}
       </Span>
       {row ? (
-        <WorkflowRunsView repository={repository} row={row} onRerun={() => void watchState.refresh()} />
+        <WorkflowRunsView repository={repository} row={row} onRerun={() => void watchState.refresh()} detailed />
       ) : watchState.activity.status === "loading" ? (
         <Span $color="textMuted">Loading…</Span>
       ) : watchState.activity.status === "failed" ? (
