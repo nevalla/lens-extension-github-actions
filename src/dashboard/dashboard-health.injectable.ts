@@ -42,7 +42,9 @@ export const dashboardHealthInjectable = getInjectable2({
         if (unfetched?.state.activity.status === "failed")
           return {
             state: "unreachable",
-            message: `Could not read ${unfetched.watch.repository} from GitHub: ${unfetched.state.activity.message}. Trying again.`,
+            message: `${unfetched.state.activity.problem.title} ${unfetched.state.activity.problem.fix}${
+              unfetched.state.activity.problem.waitsForUser ? " Checking is paused until you check again." : ""
+            }`,
           };
 
         if (watches.some(({ state }) => !state.summary))
