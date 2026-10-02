@@ -25,6 +25,16 @@ describe("failedLogLinesOf", () => {
     ]);
   });
 
+  it("marks the errors and warnings of Kubernetes' tools, which log in klog's format", () => {
+    const klog = [
+      'e2e\tCreate cluster\t2026-10-01T08:00:00.0000000Z E1002 14:09:14.046485   12195 memcache.go:381] "Couldn\'t get current server API group list"',
+      "e2e\tCreate cluster\t2026-10-01T08:00:00.1000000Z W1002 14:09:15.000001   12195 loader.go:222] Config not found",
+      "e2e\tCreate cluster\t2026-10-01T08:00:00.2000000Z E2E tests failed",
+    ].join("\n");
+
+    expect(failedLogLinesOf(klog).map((line) => line.kind)).toEqual(["error", "warning", "plain"]);
+  });
+
   it("keeps the last lines only", () => {
     expect(failedLogLinesOf(output, 2).map((line) => line.kind)).toEqual(["warning", "error"]);
   });

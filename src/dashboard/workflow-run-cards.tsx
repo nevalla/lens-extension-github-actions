@@ -245,7 +245,8 @@ const Summary = ({ row }: { row: VersionRuns }) => {
 /**
  * A version's workflows: a card per workflow, folded when it succeeded, with a timeline of its jobs. In
  * full, as the workflows tab shows them, each job opens to its steps and the end of a failed job's log;
- * compact, as the workflows dialog gives a quick look, a job is its line alone.
+ * compact, as the details panel gives a quick look under the version's own properties, a job is its line
+ * alone and the version's message is left to those properties.
  */
 export const WorkflowRunCards = ({
   repository,
@@ -262,7 +263,7 @@ export const WorkflowRunCards = ({
   compact?: boolean;
 }) => (
   <Div $flex={{ direction: "vertical", gap: compact ? "m" : "l" }}>
-    <Span $color="textMuted">{row.version.title}</Span>
+    {!compact && <Span $color="textMuted">{row.version.title}</Span>}
     <Summary row={row} />
     {row.runs.map((run) => (
       <RunCard

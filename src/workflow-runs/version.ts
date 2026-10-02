@@ -61,3 +61,13 @@ export const summaryOf = (row: Pick<VersionRuns, "runs">) => {
     status: overallStatusOf(row.runs),
   };
 };
+
+/** How many versions passed all their workflows, of those that ran any: one without runs says nothing of CI. */
+export const workflowsPassingOf = (rows: readonly Pick<VersionRuns, "runs">[]) => {
+  const ran = rows.filter((row) => row.runs.length > 0);
+
+  return {
+    passing: ran.filter((row) => row.runs.every((run) => run.conclusion === "success")).length,
+    ran: ran.length,
+  };
+};

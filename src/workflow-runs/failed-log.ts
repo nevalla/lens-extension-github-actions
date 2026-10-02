@@ -10,6 +10,8 @@ const columns = /^[^\t]*\t[^\t]*\t\uFEFF?(?:\d{4}-\d{2}-\d{2}T[\d:.]+Z ?)?/;
 const colours = /\u001b\[[0-9;]*m/g;
 const groupMarkers = /^##\[(?:group|endgroup)\]/;
 const marker = /^##\[(error|warning)\]/;
+// Kubernetes' tools log in klog's format: "E1002 14:09:14.046485   12195 memcache.go:381] ...", E an error, F a fatal one, W a warning.
+const klog = /^([EFW])\d{4} \d{2}:\d{2}:\d{2}\.\d+\s+\d+ [^\]\s]+\] /;
 
 /** The last lines of a failed job's log, cleaned of what GitHub's own log view hides. */
 export const failedLogLinesOf = (output: string, max = 50): LogLine[] =>
@@ -21,7 +23,9 @@ export const failedLogLinesOf = (output: string, max = 50): LogLine[] =>
     .map((text): LogLine => {
       const marked = text.match(marker);
 
-      return marked
-        ? { text: text.slice(marked[0].length), kind: marked[1] as LogLine["kind"] }
-        : { text, kind: "plain" };
+      if (marked) return { text: text.slice(marked[0].length), kind: marked[1] as LogLine["kind"] };
+
+      const logged = text.match(klog);
+
+      return { text, kind: logged ? (logged[1] === "W" ? "warning" : "error") : "plain" };
     });

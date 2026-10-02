@@ -13,6 +13,7 @@ import {
 import { clusterRetrySeconds } from "../deployments/cluster-images.injectable";
 import { liveCheckSeconds } from "../workflow-runs/track-activity.injectable";
 import { versionsAsked, versionsWithRuns } from "../workflow-runs/track-sources.injectable";
+import { workflowsPassingOf } from "../workflow-runs/version";
 import { gitOpsSyncsTableKind } from "./gitops-syncs-table.injectable";
 import { GhProblemNotice } from "./gh-problem-notice";
 import { Panel } from "./panel";
@@ -41,7 +42,7 @@ export const RepositorySection = observer(({ clusterId, watch }: { clusterId: st
   const syncs = summary?.syncs ?? [];
   // A repository the cluster runs no images of, but applies with Flux or Argo CD: a GitOps repository.
   const gitOpsOnly = !!summary && summary.services.length === 0 && syncs.length > 0;
-  const passing = rows.filter((row) => row.runs.length > 0 && row.runs.every((run) => run.conclusion === "success"));
+  const workflows = workflowsPassingOf(rows);
 
   // Follows GitHub and the cluster while the dashboard shows them, and stops when it does not.
   // Notifications follow it too, for as long as the dashboard shows it.
@@ -87,8 +88,8 @@ export const RepositorySection = observer(({ clusterId, watch }: { clusterId: st
           <StatCard
             icon={<CheckCircleIcon $size="m" />}
             title="Services"
-            value={summary ? `${summary.onNewest}/${summary.services.length}` : "–"}
-            label={`on the latest ${unit}`}
+            value={summary && summary.services.length > 0 ? `${summary.onNewest}/${summary.services.length}` : "–"}
+            label={summary && summary.services.length === 0 ? "none on this cluster" : `on the latest ${unit}`}
           />
         )}
         <StatCard
@@ -106,8 +107,12 @@ export const RepositorySection = observer(({ clusterId, watch }: { clusterId: st
         <StatCard
           icon={<RefreshIcon $size="m" />}
           title="Workflows"
-          value={activity.status === "loaded" ? `${passing.length}/${rows.length}` : "–"}
-          label={`recent ${unit}s passing`}
+          value={activity.status === "loaded" && workflows.ran > 0 ? `${workflows.passing}/${workflows.ran}` : "–"}
+          label={
+            activity.status === "loaded" && workflows.ran === 0
+              ? `no runs of recent ${unit}s`
+              : `recent ${unit}s passing`
+          }
         />
       </Div>
 
