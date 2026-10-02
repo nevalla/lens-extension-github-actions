@@ -11,4 +11,5 @@ First release.
 - Follows a newer build through Flux: selected by image automation, committed to the GitOps repository, applied by its Kustomization or HelmRelease, Helm chart upgrades (where migrations run), the rollout, or failing to apply, with Flux's message.
 - **GitHub Actions settings** in every cluster's right-click menu: choose which repositories to watch for that cluster, following the commits of a branch, or releases with or without pre-releases, optionally only those whose tag matches a pattern such as `v*`.
 - A status bar item shows how the cluster you are looking at stands, and opens its dashboard.
+- Notifies when services go live on a newer version, CI fails, something fails to apply, or the cluster or GitHub cannot be read, for the clusters followed; each watch chooses which.
 - Checks GitHub through the GitHub CLI every 15 seconds while runs are unfinished or a deployment is under way, and once a minute for new commits otherwise. Links open commits, releases and Kubernetes resources.

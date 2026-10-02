@@ -4,6 +4,7 @@ import { useInject } from "@k8slens/use-inject";
 import { observer } from "mobx-react";
 import { checkIntervalsInMinutes } from "../watched-repositories/watched-repository";
 import {
+  type Notify,
   type Track,
   watchedRepositoryFormInjectable,
 } from "../watched-repositories/watched-repository-form.injectable";
@@ -13,6 +14,12 @@ const intervalOptions: readonly SelectOption<string>[] = checkIntervalsInMinutes
   id: String(minutes),
   label: formatInterval(minutes),
 }));
+
+const notifyOptions: readonly SelectOption<Notify>[] = [
+  { id: "all", label: "When services go live, and of failures" },
+  { id: "failures", label: "Of failures only" },
+  { id: "off", label: "Never" },
+];
 
 const trackOptions: readonly SelectOption<Track>[] = [
   { id: "branch", label: "The commits of a branch" },
@@ -88,6 +95,11 @@ export const WatchedRepositoryForm = observer(({ clusterId }: { clusterId: strin
           selected={String(form.intervalMinutes.get())}
           onSelect={(id) => form.intervalMinutes.set(Number(id))}
         />
+      </Div>
+
+      <Div $flex={{ direction: "vertical", gap: "xs" }}>
+        <Span $color="textMuted">Notify</Span>
+        <SingleSelect options={notifyOptions} selected={form.notify.get()} onSelect={(id) => form.notify.set(id)} />
       </Div>
 
       {form.error && <Span $color="critical">{form.error}</Span>}

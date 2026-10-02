@@ -8,6 +8,7 @@ const defaultBranch = "main";
 const defaultIntervalMinutes = 5;
 
 export type Track = NonNullable<WatchedRepository["track"]>;
+export type Notify = NonNullable<WatchedRepository["notify"]>;
 
 export const watchedRepositoryFormInjectable = getInjectable2({
   id: "github-actions-watched-repository-form",
@@ -24,6 +25,7 @@ export const watchedRepositoryFormInjectable = getInjectable2({
       const includePrereleases = observable.box(true);
       const tagPattern = observable.box("");
       const intervalMinutes = observable.box(defaultIntervalMinutes);
+      const notify = observable.box<Notify>("all");
       const editing = observable.box<WatchedRepository | undefined>(undefined, { deep: false });
 
       const draft = computed((): WatchedRepository =>
@@ -35,12 +37,14 @@ export const watchedRepositoryFormInjectable = getInjectable2({
               includePrereleases: includePrereleases.get(),
               tagPattern: tagPattern.get().trim() || undefined,
               intervalMinutes: intervalMinutes.get(),
+              notify: notify.get(),
             }
           : {
               repository: repository.get().trim(),
               track: "branch",
               branch: branch.get().trim(),
               intervalMinutes: intervalMinutes.get(),
+              notify: notify.get(),
             },
       );
 
@@ -66,6 +70,7 @@ export const watchedRepositoryFormInjectable = getInjectable2({
         includePrereleases.set(true);
         tagPattern.set("");
         intervalMinutes.set(defaultIntervalMinutes);
+        notify.set("all");
         editing.set(undefined);
       });
 
@@ -76,6 +81,7 @@ export const watchedRepositoryFormInjectable = getInjectable2({
         includePrereleases,
         tagPattern,
         intervalMinutes,
+        notify,
 
         get isEditing() {
           return editing.get() !== undefined;
@@ -96,6 +102,7 @@ export const watchedRepositoryFormInjectable = getInjectable2({
           includePrereleases.set(watch.includePrereleases ?? true);
           tagPattern.set(watch.tagPattern ?? "");
           intervalMinutes.set(watch.intervalMinutes);
+          notify.set(watch.notify ?? "all");
           editing.set(watch);
         }),
 
