@@ -177,7 +177,8 @@ export const VersionDetailsPanel = observer(({ clusterId }: { clusterId: string 
         bottom: 0,
         width: "min(760px, 70%)",
         boxShadow: "-4px 0 16px rgba(0, 0, 0, 0.35)",
-        zIndex: 1,
+        // Above the column resize handles of the tables beneath it.
+        zIndex: 100,
       }}
     >
       <VersionDetails clusterId={clusterId} watchKey={current.watchKey} versionId={current.versionId} />
