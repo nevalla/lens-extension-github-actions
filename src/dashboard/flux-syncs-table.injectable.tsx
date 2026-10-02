@@ -1,7 +1,5 @@
 import { A, Code, Div, Span } from "@k8slens/element-components";
 import { CheckCircleIcon, ErrorIcon, ScheduleIcon, WarningIcon } from "@k8slens/icon";
-import { getSubscribableInjectableBunch } from "@k8slens/subscribable";
-import { ColumnHeader } from "@k8slens/table-components";
 import {
   getTableColumnInjectableBunch,
   getTableInjectableBunch,
@@ -9,46 +7,21 @@ import {
   type TableColumnCellProps,
 } from "@k8slens/table-contracts";
 import { useInject } from "@k8slens/use-inject";
-import { reaction } from "mobx";
 import type { FluxSync } from "../deployments/flux-syncs";
 import { openResourceDetailsInjectable } from "../deployments/open-resource-details.injectable";
 import { openVersionInjectable } from "../workflow-runs/open-version.injectable";
-import { watchOnClusterInjectable } from "./watch-on-cluster.injectable";
-
-type Params = [clusterId: string, watchKey: string];
+import { columnHeader, getWatchRowsBunch, type WatchTableParams } from "./watch-table";
 
 /** A Kustomization with the cluster it is in, which is what opening its details asks for. */
 interface Row extends FluxSync {
   readonly clusterId: string;
 }
 
-export const fluxSyncsTableKind = getTableKind<Row, Params>("github-actions-flux-syncs");
+export const fluxSyncsTableKind = getTableKind<Row, WatchTableParams>("github-actions-flux-syncs");
 
-export const fluxSyncsBunch = getSubscribableInjectableBunch<readonly Row[], Params>()({
-  id: "flux-syncs",
-  source: {
-    instantiate: (di) => {
-      const watchOnCluster = di.inject(watchOnClusterInjectable);
-
-      return () => (clusterId, watchKey) => ({
-        start: ({ push }) => {
-          const watchState = watchOnCluster(clusterId, watchKey);
-          const stopWatching = watchState.watch();
-          const stopPushing = reaction(
-            () => watchState.summary?.syncs,
-            (syncs) => syncs && push(syncs.map((sync) => ({ ...sync, clusterId }))),
-            { fireImmediately: true },
-          );
-
-          return () => {
-            stopPushing();
-            stopWatching();
-          };
-        },
-      });
-    },
-  },
-});
+export const fluxSyncsBunch = getWatchRowsBunch<Row>("flux-syncs", (watchState, clusterId) =>
+  watchState.summary?.syncs.map((sync) => ({ ...sync, clusterId })),
+);
 
 export const fluxSyncsTable = getTableInjectableBunch({
   kind: fluxSyncsTableKind,
@@ -133,13 +106,11 @@ const SourceCell = ({ row }: CellProps) => (
   </Span>
 );
 
-const header = (text: string) => () => <ColumnHeader>{text}</ColumnHeader>;
-
 const columns = [
-  ["name", NameCell, header("Kustomization")],
-  ["applied", AppliedCell, header("Applied")],
-  ["status", StatusCell, header("Status")],
-  ["source", SourceCell, header("Source")],
+  ["name", NameCell, columnHeader("Kustomization")],
+  ["applied", AppliedCell, columnHeader("Applied")],
+  ["status", StatusCell, columnHeader("Status")],
+  ["source", SourceCell, columnHeader("Source")],
 ] as const;
 
 export const [fluxSyncNameColumn, fluxSyncAppliedColumn, fluxSyncStatusColumn, fluxSyncSourceColumn] = columns.map(

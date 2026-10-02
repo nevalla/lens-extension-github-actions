@@ -145,7 +145,12 @@ export const trackActivityInjectable = getInjectable2({
           return state.get();
         },
 
-        refresh: () => check(checkAll),
+        // A quick check under way would answer for less than asked, so a full one follows it.
+        refresh: async () => {
+          await checking;
+
+          return check(checkAll);
+        },
 
         /**
          * Starts checking; the function it returns stops. `isBusy` keeps the checks live while it says

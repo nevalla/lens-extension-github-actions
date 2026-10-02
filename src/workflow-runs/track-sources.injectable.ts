@@ -7,7 +7,7 @@ import { toVersionRuns, type Version, type VersionRuns } from "./version";
 import { workflowRunJsonFields, workflowRunSchema } from "./workflow-run";
 
 /** How far back a running service can be placed. */
-const versionsAsked = 30;
+export const versionsAsked = 30;
 /** Releases asked for when only those of a tag pattern count, so enough of them are left. */
 const releasesAskedForPattern = 100;
 /** The versions whose runs are shown. */
@@ -20,7 +20,7 @@ const ghEnv = { GH_NO_UPDATE_NOTIFIER: "1", GH_PROMPT_DISABLED: "1", NO_COLOR: "
 
 const commitsJq = `[.[] | {sha, title: (.commit.message | split("\\n")[0]), committedAt: .commit.committer.date}]`;
 
-const commitJq = `{sha, title: (.commit.message | split("\n")[0])}`;
+const commitJq = `{sha, title: (.commit.message | split("\\n")[0])}`;
 
 const commitSchema = z.object({ sha: z.string(), title: z.string(), committedAt: z.string() });
 
@@ -33,7 +33,7 @@ const releaseSchema = z.object({
 
 /** Where the versions of one watch come from. */
 export interface TrackSource {
-  /** The newest version, in one cheap call: what tells a new one has landed. */
+  /** The newest version, in one call: what tells a new one has landed. */
   readonly headOf: () => Promise<string | undefined>;
   /** The latest versions, newest first, and the runs of the most recent of them. */
   readonly all: () => Promise<{ versions: readonly Version[]; recent: readonly VersionRuns[] }>;
@@ -59,8 +59,13 @@ export const trackSourcesInjectable = getInjectable2({
           ),
         );
 
+    // Asked for the id alone, GitHub answers with just that rather than the whole commit and its diff.
     const commitOf = async (repository: string, ref: string) =>
-      (await gh(`api ${shellQuote(`repos/${repository}/commits/${encodeURIComponent(ref)}`)} --jq .sha`)).trim();
+      (
+        await gh(
+          `api -H ${shellQuote("Accept: application/vnd.github.sha")} ${shellQuote(`repos/${repository}/commits/${encodeURIComponent(ref)}`)}`,
+        )
+      ).trim();
 
     const taggedCommitOf = async (repository: string, tag: string) =>
       z
@@ -135,9 +140,26 @@ export const trackSourcesInjectable = getInjectable2({
             url: `https://github.com/${repository}/releases/tag/${encodeURIComponent(release.tagName)}`,
           }));
 
+      // A release's tag rarely moves, so what it points to is asked for once and kept until the extension
+      // reloads: a tag force-moved meanwhile shows its old commit until then.
+      const taggedCommits = new Map<string, Promise<{ sha: string; title: string }>>();
+      const taggedCommitOfRelease = (tag: string) => {
+        const kept = taggedCommits.get(tag);
+
+        if (kept) return kept;
+
+        const commit = taggedCommitOf(repository, tag);
+
+        taggedCommits.set(tag, commit);
+        // One that failed is asked for again next time.
+        commit.catch(() => taggedCommits.get(tag) === commit && taggedCommits.delete(tag));
+
+        return commit;
+      };
+
       // A release's own name is usually its tag, so what it says is the message of the commit it points to.
       const releaseRunsOf = async (version: Version) => {
-        const commit = await taggedCommitOf(repository, version.id);
+        const commit = await taggedCommitOfRelease(version.id);
 
         return runsOf(repository, version.id, commit.sha, { ...version, title: commit.title });
       };

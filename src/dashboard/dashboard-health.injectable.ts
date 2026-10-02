@@ -3,6 +3,7 @@ import { computed } from "mobx";
 import { watchedRepositoriesStoreInjectable } from "../watched-repositories/watched-repositories-store.injectable";
 import { overallStatusOf } from "../workflow-runs/run-status";
 import { followedLabelOf, watchKeyOf } from "../watched-repositories/watched-repository";
+import { serviceLookOf } from "./flux-stage";
 import { watchOnClusterInjectable } from "./watch-on-cluster.injectable";
 
 export interface DashboardHealth {
@@ -35,6 +36,15 @@ export const dashboardHealthInjectable = getInjectable2({
             message: `Could not read what this cluster runs: ${unreadable.message}. Trying again.`,
           };
 
+        // GitHub not answering leaves no summary, which is not "still checking": it would say so forever.
+        const unfetched = watches.find(({ state }) => state.activity.status === "failed");
+
+        if (unfetched?.state.activity.status === "failed")
+          return {
+            state: "unreachable",
+            message: `Could not read ${unfetched.watch.repository} from GitHub: ${unfetched.state.activity.message}. Trying again.`,
+          };
+
         if (watches.some(({ state }) => !state.summary))
           return { state: "checking", message: "Checking GitHub and the cluster…" };
 
@@ -51,12 +61,8 @@ export const dashboardHealthInjectable = getInjectable2({
           };
 
         const services = watches.flatMap(({ state }) => state.summary?.services ?? []);
-        const fluxFailing = services.filter(
-          (service) =>
-            service.flux?.state === "failed" ||
-            service.pickedUp?.stage === "failed" ||
-            service.chart?.pending?.stage === "failed",
-        );
+        // The same reading of a service as its row in the table, so the two never disagree.
+        const fluxFailing = services.filter((service) => serviceLookOf(service) === "failed");
 
         const syncs = watches.flatMap(({ state }) => state.summary?.syncs ?? []);
         const syncsFailing = syncs.filter((sync) => sync.pending?.stage === "failed");
@@ -76,9 +82,7 @@ export const dashboardHealthInjectable = getInjectable2({
             message: "Nothing in this cluster runs a build of what is watched.",
           };
 
-        const deploying = services.filter(
-          (service) => service.rollingOut || service.pickedUp || service.chart?.pending || !service.running,
-        );
+        const deploying = services.filter((service) => serviceLookOf(service) === "progressing");
 
         const syncsDeploying = syncs.filter((sync) => sync.pending);
 

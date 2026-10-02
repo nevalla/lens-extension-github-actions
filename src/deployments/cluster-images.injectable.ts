@@ -91,21 +91,23 @@ export const clusterImagesInjectable = getInjectable2({
       // Tells a start still connecting apart from the watch it was started for, once that has stopped.
       let generation = 0;
 
-      const follow = async <T, R>(
-        subscribable: Subscribable<readonly T[]>,
-        toItems: (resource: T) => R[],
-      ): Promise<Source<R>> => {
-        const startedFor = generation;
-        const subscription = subscribable.subscribe();
+      /**
+       * Follows resources for the attempt started at `startedFor`: a subscription arriving after that
+       * attempt failed or was stopped, as a fallback version tried late does, lets go of itself.
+       */
+      const followFor =
+        (startedFor: number) =>
+        async <T, R>(subscribable: Subscribable<readonly T[]>, toItems: (resource: T) => R[]): Promise<Source<R>> => {
+          const subscription = subscribable.subscribe();
 
-        subscription.claim();
-        if (startedFor === generation) disposers.push(subscription.dispose);
-        else subscription.dispose();
+          subscription.claim();
+          if (startedFor === generation) disposers.push(subscription.dispose);
+          else subscription.dispose();
 
-        const resources = await subscription.value;
+          const resources = await subscription.value;
 
-        return computed(() => resources.get().flatMap(toItems));
-      };
+          return computed(() => resources.get().flatMap(toItems));
+        };
 
       /** Follows the first version the cluster serves; none when Flux's part is not installed. */
       const followOptional = <R>(...attempts: (() => Promise<Source<R>>)[]) =>
@@ -226,6 +228,7 @@ export const clusterImagesInjectable = getInjectable2({
 
       const start = async () => {
         const startedFor = generation;
+        const follow = followFor(startedFor);
 
         try {
           await connectCluster(clusterId);
@@ -330,12 +333,13 @@ export const clusterImagesInjectable = getInjectable2({
 
           // What was subscribed before the failure is let go, and all of it asked for again in a while:
           // a connection that dropped, or a cluster that was unreachable, comes back without a reopen.
+          // Moving on a generation makes what this attempt still has in flight let go of itself too.
+          generation++;
           disposers.forEach((dispose) => dispose());
           disposers = [];
           runInAction(() => failure.set(messageOf(error)));
-          retryTimer = setTimeout(() => {
-            if (startedFor === generation) void start();
-          }, clusterRetrySeconds * 1000);
+          // Stopping clears the timer, so a retry only ever starts for a watch still running.
+          retryTimer = setTimeout(() => void start(), clusterRetrySeconds * 1000);
         }
       };
 

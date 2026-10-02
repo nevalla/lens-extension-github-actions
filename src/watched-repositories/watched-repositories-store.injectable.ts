@@ -32,7 +32,9 @@ export const watchedRepositoriesStoreInjectable = getInjectable2({
           const watched = await getWatchedRepositories();
           const index = watched.findIndex((each) => isSameWatch(each, previous));
 
-          if (index !== -1) watched.splice(index, 1, next);
+          // Removed while it was being edited: saving it keeps what was saved, rather than nothing.
+          if (index === -1) watched.push(next);
+          else watched.splice(index, 1, next);
         }),
 
         remove: action(async (watch: WatchedRepository) => {

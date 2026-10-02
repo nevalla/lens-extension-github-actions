@@ -40,18 +40,12 @@ export interface FluxResource extends FluxOwnerRef {
   /** For a HelmRelease. */
   readonly chart?: ReleasedChart;
   /** For a Kustomization: the source it applies, and the commits it applied and tried last. */
-  readonly sourceRef?: FluxOwnerRefOf<"GitRepository" | string>;
+  readonly sourceRef?: { readonly kind: string; readonly namespace: string; readonly name: string };
   readonly appliedCommit?: string;
   readonly attemptedCommit?: string;
   readonly state: "ready" | "reconciling" | "failed";
   readonly message?: string;
   readonly revision?: string;
-}
-
-export interface FluxOwnerRefOf<Kind extends string> {
-  readonly kind: Kind;
-  readonly namespace: string;
-  readonly name: string;
 }
 
 /** A Git repository Flux fetches. */

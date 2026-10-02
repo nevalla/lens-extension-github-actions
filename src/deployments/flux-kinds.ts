@@ -118,7 +118,6 @@ export const selectedImageOf = ({ latestRef, latestImage }: ImagePolicyStatus = 
 interface ImageUpdateAutomationStatus {
   readonly lastPushCommit?: string;
   readonly lastPushTime?: string;
-  readonly conditions?: readonly Condition[];
 }
 
 /** Flux image automation: commits the selected tags to the GitOps repository. */

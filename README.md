@@ -5,7 +5,7 @@ Keep an eye on the GitHub Actions workflow runs behind each of your clusters, wi
 ## Features
 
 - A **GitHub Actions** item under every cluster in the navigator, opening that cluster's dashboard of the latest commits of each watched repository and branch, with the status of their workflow runs and whether the cluster already runs them.
-- An item in the status bar saying how the cluster you are looking at, or looked at last, stands: **Up to date**, **Behind**, **Deploying**, **Failing** or **Unreachable**, with the reason on hover. Click it to open the cluster's dashboard. It shows only for a cluster something is watched for.
+- An item in the status bar saying how the cluster you are looking at, or looked at last, stands: **Up to date**, **Behind**, **Deploying**, **Failing** or **Unreachable**, with the reason on hover. Click it to open the cluster's dashboard. It shows only for a cluster something is watched for. While it shows, it keeps that cluster's GitHub checks and cluster watches running, even with the dashboard closed.
 - **GitHub Actions settings** in every cluster's right-click menu, where each cluster gets its own list of watched GitHub repositories, each with a branch and how often to check it for new runs.
 
 ## Usage

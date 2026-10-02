@@ -1,7 +1,5 @@
 import { CheckCircleIcon, ErrorIcon, ScheduleIcon, WarningIcon } from "@k8slens/icon";
 import { A, Code, Div, getTooltipProps, Span } from "@k8slens/element-components";
-import { getSubscribableInjectableBunch } from "@k8slens/subscribable";
-import { ColumnHeader } from "@k8slens/table-components";
 import {
   getTableColumnInjectableBunch,
   getTableInjectableBunch,
@@ -9,51 +7,27 @@ import {
   type TableColumnCellProps,
 } from "@k8slens/table-contracts";
 import { useInject } from "@k8slens/use-inject";
-import { reaction } from "mobx";
 import type { ReactNode } from "react";
 import type { FluxResource, Workload } from "../deployments/cluster-images";
 import { openResourceDetailsInjectable } from "../deployments/open-resource-details.injectable";
 import { openVersionInjectable } from "../workflow-runs/open-version.injectable";
 import { isReleasesWatch, watchOfKey } from "../watched-repositories/watched-repository";
 import { type ServiceRow, serviceLookOf, serviceStatusOf } from "./flux-stage";
-import { watchOnClusterInjectable } from "./watch-on-cluster.injectable";
+import { columnHeader, getWatchRowsBunch, type WatchTableParams } from "./watch-table";
 import { ServiceTooltip } from "./service-tooltip";
 import { FluxResourceIcon } from "./flux-resource-icon";
-
-type Params = [clusterId: string, watchKey: string];
 
 /** A service with the cluster it runs in, which is what opening its details asks for. */
 interface Row extends ServiceRow {
   readonly clusterId: string;
 }
 
-export const servicesTableKind = getTableKind<Row, Params>("github-actions-services");
+export const servicesTableKind = getTableKind<Row, WatchTableParams>("github-actions-services");
 
-export const servicesBunch = getSubscribableInjectableBunch<readonly Row[], Params>()({
-  id: "services",
-  source: {
-    instantiate: (di) => {
-      const watchOnCluster = di.inject(watchOnClusterInjectable);
+export const servicesBunch = getWatchRowsBunch<Row>("services", (watchState, clusterId, watchKey) => {
+  const unit = isReleasesWatch(watchOfKey(watchKey)) ? "release" : "commit";
 
-      return () => (clusterId, watchKey) => ({
-        start: ({ push }) => {
-          const watchState = watchOnCluster(clusterId, watchKey);
-          const unit = isReleasesWatch(watchOfKey(watchKey)) ? "release" : "commit";
-          const stopWatching = watchState.watch();
-          const stopPushing = reaction(
-            () => watchState.summary?.services,
-            (services) => services && push(services.map((service) => ({ ...service, unit, clusterId }))),
-            { fireImmediately: true },
-          );
-
-          return () => {
-            stopPushing();
-            stopWatching();
-          };
-        },
-      });
-    },
-  },
+  return watchState.summary?.services.map((service) => ({ ...service, unit, clusterId }));
 });
 
 export const servicesTable = getTableInjectableBunch({
@@ -169,49 +143,21 @@ const WorkloadsCell = ({ row }: CellProps) => (
   </Span>
 );
 
-const header = (text: string) => () => <ColumnHeader>{text}</ColumnHeader>;
-const ServiceHeader = header("Service");
-const CommitHeader = header("Version");
-const StateHeader = header("Status");
-const WorkloadsHeader = header("Workloads");
-const FluxHeader = header("Flux");
+const columns = [
+  ["service-name", NameCell, columnHeader("Service")],
+  ["service-commit", VersionCell, columnHeader("Version")],
+  ["service-state", StateCell, columnHeader("Status")],
+  ["service-flux", FluxCell, columnHeader("Flux")],
+  ["service-workloads", WorkloadsCell, columnHeader("Workloads")],
+] as const;
 
-export const serviceNameColumn = getTableColumnInjectableBunch({
-  id: "github-actions-service-name",
-  kind: servicesTableKind,
-  orderNumber: 20,
-  Cell: NameCell,
-  Header: ServiceHeader,
-});
-
-export const serviceCommitColumn = getTableColumnInjectableBunch({
-  id: "github-actions-service-commit",
-  kind: servicesTableKind,
-  orderNumber: 30,
-  Cell: VersionCell,
-  Header: CommitHeader,
-});
-
-export const serviceStateColumn = getTableColumnInjectableBunch({
-  id: "github-actions-service-state",
-  kind: servicesTableKind,
-  orderNumber: 40,
-  Cell: StateCell,
-  Header: StateHeader,
-});
-
-export const serviceWorkloadsColumn = getTableColumnInjectableBunch({
-  id: "github-actions-service-workloads",
-  kind: servicesTableKind,
-  orderNumber: 50,
-  Cell: WorkloadsCell,
-  Header: WorkloadsHeader,
-});
-
-export const serviceFluxColumn = getTableColumnInjectableBunch({
-  id: "github-actions-service-flux",
-  kind: servicesTableKind,
-  orderNumber: 45,
-  Cell: FluxCell,
-  Header: FluxHeader,
-});
+export const [serviceNameColumn, serviceVersionColumn, serviceStateColumn, serviceFluxColumn, serviceWorkloadsColumn] =
+  columns.map(([id, Cell, Header], index) =>
+    getTableColumnInjectableBunch({
+      id: `github-actions-${id}`,
+      kind: servicesTableKind,
+      orderNumber: (index + 1) * 10,
+      Cell,
+      Header,
+    }),
+  );

@@ -12,7 +12,7 @@ import {
 } from "../watched-repositories/watched-repository";
 import { clusterRetrySeconds } from "../deployments/cluster-images.injectable";
 import { liveCheckSeconds } from "../workflow-runs/track-activity.injectable";
-import { versionsWithRuns } from "../workflow-runs/track-sources.injectable";
+import { versionsAsked, versionsWithRuns } from "../workflow-runs/track-sources.injectable";
 import { fluxSyncsTableKind } from "./flux-syncs-table.injectable";
 import { Panel } from "./panel";
 import { servicesTableKind } from "./services-table.injectable";
@@ -132,7 +132,9 @@ export const RepositorySection = observer(({ clusterId, watch }: { clusterId: st
               <Span $color="textMuted">Trying again every {clusterRetrySeconds} seconds.</Span>
             </Div>
           ) : summary && summary.services.length === 0 ? (
-            <Span $color="textMuted">Nothing in this cluster runs a build of the last 30 {unit}s.</Span>
+            <Span $color="textMuted">
+              Nothing in this cluster runs a build of the last {versionsAsked} {unit}s.
+            </Span>
           ) : (
             <Div $style={tableHeight(summary?.services.length ?? 3)}>
               <Table kind={servicesTableKind} params={params} />

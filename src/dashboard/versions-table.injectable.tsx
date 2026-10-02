@@ -1,6 +1,4 @@
 import { A, Code, Div, getTooltipProps, Span } from "@k8slens/element-components";
-import { getSubscribableInjectableBunch } from "@k8slens/subscribable";
-import { ColumnHeader } from "@k8slens/table-components";
 import {
   getTableColumnInjectableBunch,
   getTableInjectableBunch,
@@ -8,7 +6,6 @@ import {
   type TableColumnCellProps,
 } from "@k8slens/table-contracts";
 import { useInject } from "@k8slens/use-inject";
-import { reaction } from "mobx";
 import type { VersionSync } from "../deployments/flux-syncs";
 import type { VersionService } from "../deployments/version-services";
 import { isReleasesWatch, watchOfKey } from "../watched-repositories/watched-repository";
@@ -19,42 +16,20 @@ import { formatAge } from "./format-time-ago";
 import { RunStatusIcon } from "./run-status-icon";
 import { ServiceTooltip } from "./service-tooltip";
 import { type DotColor, StatusDot } from "./status-dot";
-import { type VersionRow, watchOnClusterInjectable } from "./watch-on-cluster.injectable";
-
-type Params = [clusterId: string, watchKey: string];
+import type { VersionRow } from "./watch-on-cluster.injectable";
+import { columnHeader, getWatchRowsBunch, type WatchTableParams } from "./watch-table";
 
 /** A row with what its services are counted in, as the tooltips say it. */
 interface Row extends VersionRow {
   readonly unit: "commit" | "release";
 }
 
-export const versionsTableKind = getTableKind<Row, Params>("github-actions-versions");
+export const versionsTableKind = getTableKind<Row, WatchTableParams>("github-actions-versions");
 
-export const versionRowsBunch = getSubscribableInjectableBunch<readonly Row[], Params>()({
-  id: "version-rows",
-  source: {
-    instantiate: (di) => {
-      const watchOnCluster = di.inject(watchOnClusterInjectable);
+export const versionRowsBunch = getWatchRowsBunch<Row>("version-rows", (watchState, _clusterId, watchKey) => {
+  const unit = isReleasesWatch(watchOfKey(watchKey)) ? "release" : "commit";
 
-      return () => (clusterId, watchKey) => ({
-        start: ({ push }) => {
-          const watchState = watchOnCluster(clusterId, watchKey);
-          const unit = isReleasesWatch(watchOfKey(watchKey)) ? "release" : "commit";
-          const stopWatching = watchState.watch();
-          const stopPushing = reaction(
-            () => (watchState.activity.status === "loading" ? undefined : watchState.rows),
-            (rows) => rows && push(rows.map((row) => ({ ...row, unit }))),
-            { fireImmediately: true },
-          );
-
-          return () => {
-            stopPushing();
-            stopWatching();
-          };
-        },
-      });
-    },
-  },
+  return watchState.activity.status === "loading" ? undefined : watchState.rows.map((row) => ({ ...row, unit }));
 });
 
 export const versionsTable = getTableInjectableBunch({
@@ -186,14 +161,12 @@ const InClusterCell = ({ row }: CellProps) => {
 
 const AgeCell = ({ row }: CellProps) => <Span>{formatAge(row.version.at)}</Span>;
 
-const header = (text: string) => () => <ColumnHeader>{text}</ColumnHeader>;
-
 const columns = [
-  ["version", VersionCell, header("Version")],
-  ["title", TitleCell, header("Message")],
-  ["checks", ChecksCell, header("Workflows")],
-  ["in-cluster", InClusterCell, header("In cluster")],
-  ["age", AgeCell, header("Age")],
+  ["version", VersionCell, columnHeader("Version")],
+  ["title", TitleCell, columnHeader("Message")],
+  ["checks", ChecksCell, columnHeader("Workflows")],
+  ["in-cluster", InClusterCell, columnHeader("In cluster")],
+  ["age", AgeCell, columnHeader("Age")],
 ] as const;
 
 export const [versionColumn, versionTitleColumn, versionChecksColumn, versionInClusterColumn, versionAgeColumn] =
