@@ -51,6 +51,22 @@ describe("toVersionRuns", () => {
   });
 });
 
+describe("toVersionRuns, what a version started", () => {
+  it("keeps apart the runs it did not start, such as Dependabot's", () => {
+    const { runs, otherRuns } = toVersionRuns(commit("abc"), [
+      { ...run("build"), event: "push" },
+      { ...run("Dependabot Updates", "completed", "failure", 2), event: "dynamic" },
+      { ...run("nightly", "completed", "success", 3), event: "schedule" },
+      { ...run("deploy", "completed", "success", 4), event: "workflow_dispatch" },
+    ]);
+
+    // A scheduled run builds the commit the branch is at, so it counts.
+    expect(runs.map((each) => each.workflowName)).toEqual(["build", "deploy", "nightly"]);
+    expect(otherRuns.map((each) => each.workflowName)).toEqual(["Dependabot Updates"]);
+    expect(overallStatusOf(runs).label).toBe("Success");
+  });
+});
+
 describe("shellQuote", () => {
   it.each([
     ["main", "'main'"],
@@ -85,6 +101,7 @@ describe("releases and their runs", () => {
     databaseId: workflowName.length + headBranch.length,
     workflowName,
     headBranch,
+    event: "push",
     status: "completed",
     conclusion,
   });

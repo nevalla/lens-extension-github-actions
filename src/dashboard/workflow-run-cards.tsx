@@ -1,0 +1,296 @@
+import { A, Button, Div, Span } from "@k8slens/element-components";
+import { ChevronRightIcon, ExpandMoreIcon } from "@k8slens/icon";
+import { PlainButton } from "@k8slens/input-components";
+import { useInject } from "@k8slens/use-inject";
+import { observer } from "mobx-react";
+import { useEffect } from "react";
+import { openVersionInjectable } from "../workflow-runs/open-version.injectable";
+import { rerunFailedJobsInjectable } from "../workflow-runs/rerun-failed-jobs.injectable";
+import { durationOf, failedStepOf, isFailed, type RunJob } from "../workflow-runs/run-jobs";
+import { runJobsInjectable } from "../workflow-runs/run-jobs.injectable";
+import { opensByDefault, runStatusOf } from "../workflow-runs/run-status";
+import { barOf, formatSpan, spanOf, stepSegmentsOf, type TimeSpan } from "../workflow-runs/run-timeline";
+import { summaryOf, type VersionRuns } from "../workflow-runs/version";
+import { runUrlOf, type WorkflowRun } from "../workflow-runs/workflow-run";
+import { expandedInjectable } from "./expanded.injectable";
+import { FailedLog } from "./failed-log";
+import { RunStatusIcon } from "./run-status-icon";
+
+const Toggle = ({ open, onToggle, label }: { open: boolean; onToggle: () => void; label: string }) => (
+  <Button $onClick={onToggle} $tooltip={open ? `Hide ${label}` : `Show ${label}`} $interactive>
+    {open ? <ExpandMoreIcon $size="s" /> : <ChevronRightIcon $size="s" />}
+  </Button>
+);
+
+/** Where a job ran within its workflow, as a bar on a track: parallel and slow jobs stand out. */
+const TimelineBar = ({ job, span }: { job: RunJob; span?: TimeSpan }) => {
+  const bar = span && barOf(job, span);
+
+  return (
+    <Div
+      $flexChild
+      $backgroundColor="backgroundPrimary"
+      $border={{ radius: "m" }}
+      $relative
+      $style={{ height: 8, minWidth: 120 }}
+    >
+      {bar && (
+        <Div
+          $backgroundColor={runStatusOf(job).color}
+          $border={{ radius: "m" }}
+          $style={{ position: "absolute", top: 0, bottom: 0, left: `${bar.offset}%`, width: `${bar.width}%` }}
+        />
+      )}
+    </Div>
+  );
+};
+
+/** A job's steps as segments of one bar, each its share of the job's time, then as a list. */
+const Steps = ({ job }: { job: RunJob }) => {
+  const segments = stepSegmentsOf(job);
+
+  return (
+    <Div $flex={{ direction: "vertical", gap: "s" }} $padding={{ left: "3xl" }}>
+      {segments.length > 0 && (
+        <Div $flex={{ direction: "horizontal" }} $style={{ height: 6, gap: 2 }}>
+          {segments.map(({ step, share, status }) => (
+            <Div
+              key={`${step.number}-${step.name}`}
+              $backgroundColor={status.color}
+              $tooltip={`${step.name} · ${durationOf(step) ?? ""} · ${status.label}`}
+              $width={`${share}%`}
+              $style={{ borderRadius: 2 }}
+            />
+          ))}
+        </Div>
+      )}
+      <Div $style={{ display: "grid", gridTemplateColumns: "16px 1fr auto", columnGap: 8, rowGap: 4 }}>
+        {(job.steps ?? []).map((step) => (
+          <Div key={`${step.number}-${step.name}`} $displayContents>
+            <RunStatusIcon status={runStatusOf(step)} />
+            <Span $color={isFailed(step) ? "critical" : undefined}>{step.name}</Span>
+            <Span $color="textMuted">{durationOf(step) ?? ""}</Span>
+          </Div>
+        ))}
+      </Div>
+    </Div>
+  );
+};
+
+const JobLine = observer(
+  ({
+    repository,
+    runId,
+    job,
+    span,
+    place,
+    compact,
+  }: {
+    repository: string;
+    runId: number;
+    job: RunJob;
+    span?: TimeSpan;
+    place: string;
+    compact: boolean;
+  }) => {
+    const expanded = useInject(expandedInjectable)(place);
+    const openLink = useInject(openVersionInjectable)();
+    const id = `job:${job.databaseId}`;
+    const open = !compact && expanded.isOpen(id, isFailed(job));
+    const failedStep = failedStepOf(job);
+
+    return (
+      <Div $flex={{ direction: "vertical", gap: "s" }}>
+        <Div $flex={{ direction: "horizontal", gap: "s", verticalAlign: "center" }}>
+          {!compact && <Toggle open={open} onToggle={() => expanded.toggle(id, isFailed(job))} label="the steps" />}
+          <RunStatusIcon status={runStatusOf(job)} />
+          <A
+            onClick={() => void openLink({ url: job.url })}
+            $tooltip="Open the job's log on GitHub"
+            $color="link"
+            $style={{
+              minWidth: 160,
+              maxWidth: 320,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {job.name}
+          </A>
+          <TimelineBar job={job} span={span} />
+          <Span $color="textMuted" $textAlign="right" $style={{ minWidth: 64 }}>
+            {durationOf(job) ?? "queued"}
+          </Span>
+        </Div>
+        {failedStep && !open && (
+          <Span $color="critical" $padding={{ left: "3xl" }}>
+            failed in {failedStep}
+          </Span>
+        )}
+        {open && <Steps job={job} />}
+        {open && isFailed(job) && (
+          <Div $padding={{ left: "3xl" }}>
+            <FailedLog repository={repository} runId={runId} job={job} />
+          </Div>
+        )}
+      </Div>
+    );
+  },
+);
+
+const RunCard = observer(
+  ({
+    repository,
+    run,
+    version,
+    onRerun,
+    place,
+    compact,
+  }: {
+    repository: string;
+    run: WorkflowRun;
+    version: string;
+    onRerun: () => void;
+    place: string;
+    compact: boolean;
+  }) => {
+    const jobs = useInject(runJobsInjectable)(repository, run.databaseId);
+    const expanded = useInject(expandedInjectable)(place);
+    const openLink = useInject(openVersionInjectable)();
+    const rerunFailedJobs = useInject(rerunFailedJobsInjectable)();
+    const status = runStatusOf(run);
+    const id = `run:${run.databaseId}`;
+    // What succeeded starts folded: the eye goes to what failed or still runs.
+    const byDefault = opensByDefault(run);
+    const open = expanded.isOpen(id, byDefault);
+    const { state } = jobs;
+    const span = state.status === "loaded" ? spanOf(state.jobs) : undefined;
+
+    // The jobs are asked for again when the run's status changes, as when it was re-run.
+    useEffect(() => jobs.watch(`${run.status}/${run.conclusion}`), [jobs, run.status, run.conclusion]);
+
+    const rerun = async () => {
+      if (await rerunFailedJobs(repository, run.databaseId, run.workflowName, version)) {
+        onRerun();
+        void jobs.refresh();
+      }
+    };
+
+    return (
+      <Div
+        $flex={{ direction: "vertical", gap: compact ? "s" : "m" }}
+        $padding={compact ? "m" : "l"}
+        $backgroundColor="backgroundSecondary"
+        $border={{ color: "borderPrimary", width: "xxs", radius: "m", left: { width: "xs", color: status.color } }}
+      >
+        <Div $flex={{ direction: "horizontal", gap: "s", verticalAlign: "center" }}>
+          <Toggle open={open} onToggle={() => expanded.toggle(id, byDefault)} label="the jobs" />
+          <RunStatusIcon status={status} />
+          <A
+            onClick={() => void openLink({ url: runUrlOf(repository, run) })}
+            $tooltip="Open the run on GitHub"
+            $color="link"
+            $font={compact ? undefined : { size: "l" }}
+          >
+            {run.workflowName}
+          </A>
+          <Span $color="textMuted">{status.label}</Span>
+          {span && <Span $color="textMuted">· {formatSpan(span.end - span.start)}</Span>}
+          {state.status === "loaded" && (
+            <Span $color="textMuted">
+              · {state.jobs.length} {state.jobs.length === 1 ? "job" : "jobs"}
+            </Span>
+          )}
+          <Div $flexChild />
+          {status.color === "critical" && <PlainButton onClick={() => void rerun()}>Re-run failed jobs</PlainButton>}
+        </Div>
+        {open && state.status === "loading" && <Span $color="textMuted">Loading jobs…</Span>}
+        {open && state.status === "failed" && (
+          <Span $color="warning" $tooltip={state.problem.detail}>
+            Could not read the jobs: {state.problem.title}
+          </Span>
+        )}
+        {open &&
+          state.status === "loaded" &&
+          state.jobs.map((job) => (
+            <JobLine
+              key={job.url}
+              repository={repository}
+              runId={run.databaseId}
+              job={job}
+              span={span}
+              place={place}
+              compact={compact}
+            />
+          ))}
+      </Div>
+    );
+  },
+);
+
+const Summary = ({ row }: { row: VersionRuns }) => {
+  const { text, status } = summaryOf(row);
+
+  return (
+    <Div $flex={{ direction: "horizontal", gap: "m", verticalAlign: "center" }}>
+      {status && <RunStatusIcon status={status} />}
+      <Span $font={{ size: "l" }}>{text}</Span>
+      {status && <Span $color="textMuted">· {status.label}</Span>}
+      {row.runsOn && <Span $color="textMuted">· runs of the tagged commit on {row.runsOn}</Span>}
+    </Div>
+  );
+};
+
+/**
+ * A version's workflows: a card per workflow, folded when it succeeded, with a timeline of its jobs. In
+ * full, as the workflows tab shows them, each job opens to its steps and the end of a failed job's log;
+ * compact, as the workflows dialog gives a quick look, a job is its line alone.
+ */
+export const WorkflowRunCards = ({
+  repository,
+  row,
+  onRerun,
+  place,
+  compact = false,
+}: {
+  repository: string;
+  row: VersionRuns;
+  onRerun: () => void;
+  /** What the open and closed cards are remembered by. */
+  place: string;
+  compact?: boolean;
+}) => (
+  <Div $flex={{ direction: "vertical", gap: compact ? "m" : "l" }}>
+    <Span $color="textMuted">{row.version.title}</Span>
+    <Summary row={row} />
+    {row.runs.map((run) => (
+      <RunCard
+        key={run.databaseId}
+        repository={repository}
+        run={run}
+        version={row.version.label}
+        onRerun={onRerun}
+        place={place}
+        compact={compact}
+      />
+    ))}
+    {/* Recorded against the commit by GitHub, as Dependabot's runs are, without being started by it. */}
+    {row.otherRuns.length > 0 && (
+      <Div $flex={{ direction: "vertical", gap: "m" }} $faded>
+        <Span $color="textMuted">Also ran on this commit · not started by it</Span>
+        {row.otherRuns.map((run) => (
+          <RunCard
+            key={run.databaseId}
+            repository={repository}
+            run={run}
+            version={row.version.label}
+            onRerun={onRerun}
+            place={place}
+            compact={compact}
+          />
+        ))}
+      </Div>
+    )}
+  </Div>
+);
