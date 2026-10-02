@@ -10,6 +10,7 @@ import { useInject } from "@k8slens/use-inject";
 import type { FluxSync } from "../deployments/flux-syncs";
 import { openResourceDetailsInjectable } from "../deployments/open-resource-details.injectable";
 import { openVersionInjectable } from "../workflow-runs/open-version.injectable";
+import { syncStatusOf } from "./flux-stage";
 import { columnHeader, getWatchRowsBunch, type WatchTableParams } from "./watch-table";
 
 /** A Kustomization with the cluster it is in, which is what opening its details asks for. */
@@ -36,23 +37,6 @@ export const fluxSyncsTable = getTableInjectableBunch({
 });
 
 type CellProps = TableColumnCellProps<Row>;
-
-// A commit older than the versions watched is as far behind as can be told, and maybe more.
-const behindLabel = ({ behind, at }: NonNullable<FluxSync["applied"]>) =>
-  behind === 0 ? "Latest" : `${behind}${at ? "" : "+"} ${behind === 1 && at ? "commit" : "commits"} behind`;
-
-export const syncStatusOf = ({ applied, pending }: FluxSync) => {
-  switch (pending?.stage) {
-    case "fetched":
-      return `${pending.label} fetched, not applied yet`;
-    case "applying":
-      return `Applying ${pending.label}`;
-    case "failed":
-      return `Failed to apply ${pending.label}`;
-  }
-
-  return applied ? behindLabel(applied) : "Not applied yet";
-};
 
 const StatusIcon = ({ row }: CellProps) => {
   if (row.pending?.stage === "failed") return <ErrorIcon $size="s" $color="critical" />;

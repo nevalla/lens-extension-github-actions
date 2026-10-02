@@ -19,7 +19,8 @@
   },
   "scripts": {
     "build": "lens-types-check && lens-package-build --entry-point ./src/index.ts",
-    "clean": "rimraf dist/"
+    "clean": "rimraf dist/",
+    "test": "vitest run"
   },
   "dependencies": {
     "@k8slens/cli-contracts": "^1.0.2",
@@ -55,6 +56,7 @@
     "@k8slens/package-build": "^3.0.0",
     "@k8slens/typescript": "^8.0.0",
     "@types/react": "^19.2.0",
-    "rimraf": "^4.4.1"
+    "rimraf": "^4.4.1",
+    "vitest": "^3.2.7"
   }
 }
