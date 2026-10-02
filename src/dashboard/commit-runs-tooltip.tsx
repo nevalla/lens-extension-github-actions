@@ -3,7 +3,16 @@ import { runStatusOf } from "../workflow-runs/run-status";
 import type { WorkflowRun } from "../workflow-runs/workflow-run";
 import { RunStatusIcon } from "./run-status-icon";
 
-export const CommitRunsTooltip = ({ runs, runsOn }: { runs: readonly WorkflowRun[]; runsOn?: string }) => (
+export const CommitRunsTooltip = ({
+  runs,
+  runsOn,
+  others = 0,
+}: {
+  runs: readonly WorkflowRun[];
+  runsOn?: string;
+  /** How many runs it did not start were recorded against it too. */
+  others?: number;
+}) => (
   <Div $flex={{ direction: "vertical", gap: "xs" }}>
     {runsOn && <Span $color="textMuted">Runs of the tagged commit on {runsOn}</Span>}
     {runs.map((run) => {
@@ -17,5 +26,10 @@ export const CommitRunsTooltip = ({ runs, runsOn }: { runs: readonly WorkflowRun
         </Div>
       );
     })}
+    {others > 0 && (
+      <Span $color="textMuted">
+        +{others} {others === 1 ? "run" : "runs"} not started by it
+      </Span>
+    )}
   </Div>
 );

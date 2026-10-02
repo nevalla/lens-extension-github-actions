@@ -1,4 +1,4 @@
-import type { WorkflowRun } from "./workflow-run";
+import { isStartedByVersion, type WorkflowRun } from "./workflow-run";
 
 /** One version of what a watch follows: a commit of a branch, or a release. Newest first wherever listed. */
 export interface Version {
@@ -17,8 +17,10 @@ export interface Version {
 
 export interface VersionRuns {
   readonly version: Version;
-  /** The newest run of each workflow, by workflow name. */
+  /** The newest run of each workflow the version started, by workflow name: what its CI status is of. */
   readonly runs: readonly WorkflowRun[];
+  /** Runs recorded against it that it did not start, such as Dependabot's: shown apart, counted for nothing. */
+  readonly otherRuns: readonly WorkflowRun[];
   /**
    * The branch the runs ran on, when they are not the version's own: a release with no runs of its own
    * shows those of the commit it was tagged on, as a repository that builds on its default branch has.
@@ -26,12 +28,16 @@ export interface VersionRuns {
   readonly runsOn?: string;
 }
 
+const newestOfEachWorkflow = (newestFirst: readonly WorkflowRun[]) =>
+  newestFirst
+    // A workflow run again on the same commit replaces what it said before.
+    .filter((run, index) => newestFirst.findIndex((each) => each.workflowName === run.workflowName) === index)
+    .sort((a, b) => a.workflowName.localeCompare(b.workflowName));
+
 /** A version with the runs GitHub lists for it, newest first. */
 export const toVersionRuns = (version: Version, newestFirst: readonly WorkflowRun[], runsOn?: string): VersionRuns => ({
   version,
   runsOn,
-  // A workflow run again on the same commit replaces what it said before.
-  runs: newestFirst
-    .filter((run, index) => newestFirst.findIndex((each) => each.workflowName === run.workflowName) === index)
-    .sort((a, b) => a.workflowName.localeCompare(b.workflowName)),
+  runs: newestOfEachWorkflow(newestFirst.filter(isStartedByVersion)),
+  otherRuns: newestOfEachWorkflow(newestFirst.filter((run) => !isStartedByVersion(run))),
 });

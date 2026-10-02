@@ -52,7 +52,10 @@ export const versionsTable = getTableInjectableBunch({
 type CellProps = TableColumnCellProps<Row>;
 
 const runsTooltip = (row: Row) =>
-  getTooltipProps({ Content: CommitRunsTooltip, contentProps: { runs: row.runs, runsOn: row.runsOn } });
+  getTooltipProps({
+    Content: CommitRunsTooltip,
+    contentProps: { runs: row.runs, runsOn: row.runsOn, others: row.otherRuns.length },
+  });
 
 // The CI status leads the version: a column of its own would take a share of the width as wide as any other.
 const VersionCell = ({ row }: CellProps) => {
@@ -83,7 +86,9 @@ const TitleCell = ({ row }: CellProps) =>
 const ChecksCell = ({ row }: CellProps) => {
   const openWorkflowsModal = useInject(openWorkflowsModalInjectable)();
 
-  if (row.runs.length === 0) return <Span $color="textMuted">—</Span>;
+  if (row.runs.length === 0 && row.otherRuns.length === 0) return <Span $color="textMuted">—</Span>;
+
+  const others = row.otherRuns.length;
 
   return (
     <A
@@ -91,7 +96,10 @@ const ChecksCell = ({ row }: CellProps) => {
       $tooltip={runsTooltip(row)}
       $color="link"
     >
-      {row.runs.filter((run) => run.conclusion === "success").length}/{row.runs.length} passed
+      {/* Only what the version started counts; GitHub's own runs recorded against it do not. */}
+      {row.runs.length > 0
+        ? `${row.runs.filter((run) => run.conclusion === "success").length}/${row.runs.length} passed`
+        : `${others} other ${others === 1 ? "run" : "runs"}`}
       {row.runsOn && <Span $color="textMuted"> · on {row.runsOn}</Span>}
     </A>
   );

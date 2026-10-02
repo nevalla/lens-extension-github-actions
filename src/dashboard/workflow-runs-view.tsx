@@ -205,6 +205,22 @@ export const WorkflowRunsView = ({
         detailed={detailed}
       />
     ))}
+    {/* Recorded against the commit by GitHub, as Dependabot's runs are, without being started by it. */}
+    {row.otherRuns.length > 0 && (
+      <Div $flex={{ direction: "vertical", gap: "m" }} $faded>
+        <Span $color="textMuted">Also ran on this commit · not started by it</Span>
+        {row.otherRuns.map((run) => (
+          <RunDetails
+            key={run.databaseId}
+            repository={repository}
+            run={run}
+            version={row.version.label}
+            onRerun={onRerun}
+            detailed={detailed}
+          />
+        ))}
+      </Div>
+    )}
   </Div>
 );
 
