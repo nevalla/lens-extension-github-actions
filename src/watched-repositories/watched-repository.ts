@@ -11,6 +11,11 @@ export interface WatchedRepository {
   readonly tagPattern?: string;
   /** How often everything is refreshed while nothing is happening. */
   readonly intervalMinutes: number;
+  /**
+   * Which changes notify: services going live and failures, failures only, or none. Left out, as saved
+   * before notifications, all. Not part of what a watch follows, so changing it keeps what was fetched.
+   */
+  readonly notify?: "all" | "failures" | "off";
 }
 
 export const checkIntervalsInMinutes = [1, 5, 15, 30, 60] as const;

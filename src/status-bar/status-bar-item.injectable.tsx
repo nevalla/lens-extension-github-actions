@@ -6,7 +6,7 @@ import { useInject } from "@k8slens/use-inject";
 import { computed } from "mobx";
 import { observer } from "mobx-react";
 import { useEffect } from "react";
-import { openDashboardTabInjectable } from "../dashboard/dashboard-tab.injectable";
+import { openDashboardTabInjectable } from "../dashboard/open-dashboard-tab.injectable";
 import type { DashboardHealth } from "../dashboard/dashboard-health.injectable";
 import { activeClusterHealthInjectable } from "./active-cluster-health.injectable";
 

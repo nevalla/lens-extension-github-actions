@@ -2,7 +2,7 @@ import { getInjectable2 } from "@k8slens/injectable";
 import { activeTabClusterIdReactiveInjectionToken } from "@k8slens/main-view-contracts";
 import { computed, observable, reaction, runInAction } from "mobx";
 import { dashboardHealthInjectable } from "../dashboard/dashboard-health.injectable";
-import { watchOnClusterInjectable } from "../dashboard/watch-on-cluster.injectable";
+import { followWatchInjectable } from "../notifications/follow-watch.injectable";
 import { watchKeyOf } from "../watched-repositories/watched-repository";
 import { watchedRepositoriesStoreInjectable } from "../watched-repositories/watched-repositories-store.injectable";
 
@@ -15,7 +15,7 @@ export const activeClusterHealthInjectable = getInjectable2({
     const activeClusterId = di.inject(activeTabClusterIdReactiveInjectionToken)();
     const storeOf = di.inject(watchedRepositoriesStoreInjectable);
     const healthOf = di.inject(dashboardHealthInjectable);
-    const watchOnCluster = di.inject(watchOnClusterInjectable);
+    const followWatch = di.inject(followWatchInjectable)();
 
     // A tab of no cluster, such as the dashboard itself, leaves the cluster looked at last standing,
     // rather than the item disappearing exactly where it is wanted.
@@ -70,7 +70,7 @@ export const activeClusterHealthInjectable = getInjectable2({
             const previous = stopWatches;
 
             // The new ones start before the old ones stop, so what both share keeps running.
-            stopWatches = id ? keys.map((key) => watchOnCluster(id, key).watch()) : [];
+            stopWatches = id ? keys.map((key) => followWatch(id, key)) : [];
             previous.forEach((stopWatch) => stopWatch());
           },
           { fireImmediately: true },

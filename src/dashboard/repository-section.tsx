@@ -18,6 +18,7 @@ import { Panel } from "./panel";
 import { servicesTableKind } from "./services-table.injectable";
 import { StatCard } from "./stat-card";
 import { versionsTableKind } from "./versions-table.injectable";
+import { followWatchInjectable } from "../notifications/follow-watch.injectable";
 import { watchOnClusterInjectable } from "./watch-on-cluster.injectable";
 
 // Lens's tables are as tall as where they are put, so each is given room for its rows, and scrolls past a dozen.
@@ -31,6 +32,7 @@ const checkedLabel = (activity: { mode: "live" | "idle"; checkedAt: Date }) =>
 export const RepositorySection = observer(({ clusterId, watch }: { clusterId: string; watch: WatchedRepository }) => {
   const watchKey = watchKeyOf(watch);
   const watchState = useInject(watchOnClusterInjectable)(clusterId, watchKey);
+  const followWatch = useInject(followWatchInjectable)();
   const { activity, cluster, summary, rows } = watchState;
   const params = useMemo((): [string, string] => [clusterId, watchKey], [clusterId, watchKey]);
   const releases = isReleasesWatch(watch);
@@ -41,7 +43,8 @@ export const RepositorySection = observer(({ clusterId, watch }: { clusterId: st
   const passing = rows.filter((row) => row.runs.length > 0 && row.runs.every((run) => run.conclusion === "success"));
 
   // Follows GitHub and the cluster while the dashboard shows them, and stops when it does not.
-  useEffect(() => watchState.watch(), [watchState]);
+  // Notifications follow it too, for as long as the dashboard shows it.
+  useEffect(() => followWatch(clusterId, watchKey), [followWatch, clusterId, watchKey]);
 
   return (
     <Div $flex={{ direction: "vertical", gap: "l" }}>

@@ -2,26 +2,18 @@ import { Div, Span } from "@k8slens/element-components";
 import { GitHubIcon } from "@k8slens/icon";
 import { PrimaryButton } from "@k8slens/input-components";
 import { mainViewTabHostKind } from "@k8slens/main-view-contracts";
-import { getTabKind, getTabKindInjectableBunch, type TabProps } from "@k8slens/tab-contracts";
+import { getTabKindInjectableBunch, type TabProps } from "@k8slens/tab-contracts";
 import { useInject } from "@k8slens/use-inject";
 import { observer } from "mobx-react";
 import { useEffect } from "react";
 import { activeClusterHealthInjectable } from "../status-bar/active-cluster-health.injectable";
 import { clusterNameInjectable } from "../cluster/cluster-name.injectable";
-import { getOpenClusterTabInjectable } from "../cluster/get-open-cluster-tab-injectable";
 import { openSettingsTabInjectable } from "../settings/settings-tab.injectable";
 import { watchKeyOf } from "../watched-repositories/watched-repository";
 import { watchedRepositoriesStoreInjectable } from "../watched-repositories/watched-repositories-store.injectable";
 import { HealthBanner } from "./health-banner";
+import { dashboardTabKind } from "./open-dashboard-tab.injectable";
 import { RepositorySection } from "./repository-section";
-
-// One tab per cluster: its id is the cluster's id.
-export const dashboardTabKind = getTabKind()("github-actions-dashboard");
-
-export const openDashboardTabInjectable = getOpenClusterTabInjectable(
-  "github-actions-open-dashboard-tab",
-  dashboardTabKind,
-);
 
 const DashboardTitle = observer(({ tabId }: TabProps<typeof mainViewTabHostKind>) => {
   const clusterName = useInject(clusterNameInjectable)(tabId).get();

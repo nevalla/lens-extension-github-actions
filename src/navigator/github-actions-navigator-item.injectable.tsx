@@ -8,7 +8,7 @@ import {
   type NavigatorItemProps,
 } from "@k8slens/navigator-contracts";
 import { computed } from "mobx";
-import { openDashboardTabInjectable } from "../dashboard/dashboard-tab.injectable";
+import { openDashboardTabInjectable } from "../dashboard/open-dashboard-tab.injectable";
 
 interface GithubActionsItem {
   readonly id: string;
