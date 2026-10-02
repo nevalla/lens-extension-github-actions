@@ -16,7 +16,6 @@ import { versionsAsked, versionsWithRuns } from "../workflow-runs/track-sources.
 import { gitOpsSyncsTableKind } from "./gitops-syncs-table.injectable";
 import { GhProblemNotice } from "./gh-problem-notice";
 import { Panel } from "./panel";
-import { WorkflowDetails } from "./workflow-details";
 import { servicesTableKind } from "./services-table.injectable";
 import { StatCard } from "./stat-card";
 import { versionsTableKind } from "./versions-table.injectable";
@@ -116,13 +115,6 @@ export const RepositorySection = observer(({ clusterId, watch }: { clusterId: st
         <Div $style={tableHeight(rows.length || versionsWithRuns)}>
           <Table kind={versionsTableKind} params={params} />
         </Div>
-        <WorkflowDetails
-          clusterId={clusterId}
-          watchKey={watchKey}
-          repository={watch.repository}
-          rows={rows}
-          onRerun={() => void watchState.refresh()}
-        />
       </Panel>
 
       {syncs.length > 0 && (

@@ -1,5 +1,4 @@
-import { A, Button, Div, Span } from "@k8slens/element-components";
-import { CloseIcon } from "@k8slens/icon";
+import { A, Div, Span } from "@k8slens/element-components";
 import { PlainButton } from "@k8slens/input-components";
 import { useInject } from "@k8slens/use-inject";
 import { observer } from "mobx-react";
@@ -12,7 +11,6 @@ import { runStatusOf } from "../workflow-runs/run-status";
 import type { VersionRuns } from "../workflow-runs/version";
 import type { WorkflowRun } from "../workflow-runs/workflow-run";
 import { RunStatusIcon } from "./run-status-icon";
-import { selectedVersionInjectable } from "./selected-version.injectable";
 
 const runUrlOf = (repository: string, run: WorkflowRun) =>
   `https://github.com/${repository}/actions/runs/${run.databaseId}`;
@@ -95,47 +93,28 @@ const RunDetails = observer(
   },
 );
 
-/** The workflows of the version picked in the table, with their jobs, under the table. */
-export const WorkflowDetails = observer(
-  ({
-    clusterId,
-    watchKey,
-    repository,
-    rows,
-    onRerun,
-  }: {
-    clusterId: string;
-    watchKey: string;
-    repository: string;
-    rows: readonly VersionRuns[];
-    onRerun: () => void;
-  }) => {
-    const selected = useInject(selectedVersionInjectable)(clusterId, watchKey);
-    const row = rows.find((each) => each.version.id === selected.id);
-
-    if (!row) return null;
-
-    return (
-      <Div $flex={{ direction: "vertical", gap: "m" }} $padding={{ top: "m" }}>
-        <Div $flex={{ direction: "horizontal", verticalAlign: "center" }}>
-          <Span $font={{ size: "l" }} $flexChild>
-            Workflows of {row.version.label}
-            {row.runsOn ? ` · on ${row.runsOn}` : ""}
-          </Span>
-          <Button $onClick={selected.clear} $tooltip="Close" $interactive>
-            <CloseIcon $size="s" />
-          </Button>
-        </Div>
-        {row.runs.map((run) => (
-          <RunDetails
-            key={run.databaseId}
-            repository={repository}
-            run={run}
-            version={row.version.label}
-            onRerun={onRerun}
-          />
-        ))}
-      </Div>
-    );
-  },
+/** A version's workflows with their jobs: what the workflows modal and tab show. */
+export const WorkflowRunsView = ({
+  repository,
+  row,
+  onRerun,
+}: {
+  repository: string;
+  row: VersionRuns;
+  onRerun: () => void;
+}) => (
+  <Div $flex={{ direction: "vertical", gap: "m" }}>
+    {row.runs.map((run) => (
+      <RunDetails
+        key={run.databaseId}
+        repository={repository}
+        run={run}
+        version={row.version.label}
+        onRerun={onRerun}
+      />
+    ))}
+  </Div>
 );
+
+/** What names a version's workflows: "76cd335", or "v1.2.0 · on main" for runs of the commit it was tagged on. */
+export const workflowsTitleOf = (row: VersionRuns) => `${row.version.label}${row.runsOn ? ` · on ${row.runsOn}` : ""}`;

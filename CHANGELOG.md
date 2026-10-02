@@ -12,7 +12,7 @@ First release.
 - **GitHub Actions settings** in every cluster's right-click menu: choose which repositories to watch for that cluster, following the commits of a branch, or releases with or without pre-releases, optionally only those whose tag matches a pattern such as `v*`.
 - A status bar item shows how the cluster you are looking at stands, and opens its dashboard.
 - Notifies when services go live on a newer version, CI fails, something fails to apply, or the cluster or GitHub cannot be read, for the clusters followed; each watch chooses which.
-- Shows the jobs of a commit's or release's workflows, with links to their logs, and re-runs a failed workflow's failed jobs after confirming.
+- Shows the jobs of a commit's or release's workflows in a dialog, or in a tab of their own, with links to their logs, and re-runs a failed workflow's failed jobs after confirming.
 - A release with no workflow runs of its own shows those of the commit it was tagged on, on the repository's default branch.
 - Says why reading GitHub fails and what to do, such as gh not installed or signed out, and pauses checking until you check again when only you can fix it.
 - Checks GitHub through the GitHub CLI every 15 seconds while runs are unfinished or a deployment is under way, and once a minute for new commits otherwise. Links open commits, releases and Kubernetes resources.

@@ -16,7 +16,7 @@ import { formatAge } from "./format-time-ago";
 import { RunStatusIcon } from "./run-status-icon";
 import { ServiceTooltip } from "./service-tooltip";
 import { type DotColor, StatusDot } from "./status-dot";
-import { selectedVersionInjectable } from "./selected-version.injectable";
+import { openWorkflowsModalInjectable } from "./workflows-modal.injectable";
 import type { VersionRow } from "./watch-on-cluster.injectable";
 import { columnHeader, getWatchRowsBunch, type WatchTableParams } from "./watch-table";
 
@@ -79,14 +79,18 @@ const VersionCell = ({ row }: CellProps) => {
 const TitleCell = ({ row }: CellProps) =>
   row.version.title !== row.version.label ? <Span $tooltip={row.version.title}>{row.version.title}</Span> : null;
 
-// Clicking it shows the version's workflows and their jobs under the table.
+// Clicking it shows the version's workflows and their jobs, over the dashboard.
 const ChecksCell = ({ row }: CellProps) => {
-  const selected = useInject(selectedVersionInjectable)(row.clusterId, row.watchKey);
+  const openWorkflowsModal = useInject(openWorkflowsModalInjectable)();
 
   if (row.runs.length === 0) return <Span $color="textMuted">—</Span>;
 
   return (
-    <A onClick={() => selected.toggle(row.version.id)} $tooltip={runsTooltip(row)} $color="link">
+    <A
+      onClick={() => void openWorkflowsModal(row.clusterId, row.watchKey, row.version.id)}
+      $tooltip={runsTooltip(row)}
+      $color="link"
+    >
       {row.runs.filter((run) => run.conclusion === "success").length}/{row.runs.length} passed
       {row.runsOn && <Span $color="textMuted"> · on {row.runsOn}</Span>}
     </A>
