@@ -66,7 +66,8 @@ export const watchNotifierInjectable = getInjectable2({
       const reading = computed((): Reading | undefined => {
         const { activity, cluster, summary, rows } = watchState;
 
-        if (activity.status === "failed") return readingOf({ services: [], syncs: [], unreadable: activity.message });
+        if (activity.status === "failed")
+          return readingOf({ services: [], syncs: [], unreadable: activity.problem.title });
         if (cluster.status === "failed") return readingOf({ services: [], syncs: [], unreadable: cluster.message });
         if (!summary) return undefined;
 

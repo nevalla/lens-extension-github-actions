@@ -1,6 +1,7 @@
 import { getInjectable2 } from "@k8slens/injectable";
 import { observable, runInAction } from "mobx";
 import { watchOfKey } from "../watched-repositories/watched-repository";
+import { type GhProblem, ghProblemOf } from "./gh-problems";
 import { trackSourcesInjectable } from "./track-sources.injectable";
 import type { Version, VersionRuns } from "./version";
 
@@ -23,13 +24,11 @@ export type TrackActivityState =
       /** Live while something is moving, so it is checked every {@link liveCheckSeconds}. */
       readonly mode: "live" | "idle";
       /** Why the last check did not go through, while what was had before stands. */
-      readonly warning?: string;
+      readonly warning?: GhProblem;
     }
-  | { readonly status: "failed"; readonly message: string };
+  | { readonly status: "failed"; readonly problem: GhProblem };
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
-const isRateLimit = (message: string) => /rate limit/i.test(message);
 
 const isUnfinished = ({ version, runs }: VersionRuns, now: number) =>
   runs.some((run) => run.status !== "completed") ||
@@ -69,7 +68,7 @@ export const trackActivityInjectable = getInjectable2({
         return recent.some((each) => isUnfinished(each, now)) || [...busyWatchers].some((isBusy) => isBusy());
       };
 
-      const set = (recent: readonly VersionRuns[], versions: readonly Version[], warning?: string) =>
+      const set = (recent: readonly VersionRuns[], versions: readonly Version[], warning?: GhProblem) =>
         runInAction(() =>
           state.set({
             status: "loaded",
@@ -103,37 +102,37 @@ export const trackActivityInjectable = getInjectable2({
         set(recent, previous.versions);
       };
 
-      const nextCheckInSeconds = () => {
-        const current = loaded();
+      const problemNow = () => {
+        const current = state.get();
 
-        if (current?.warning && isRateLimit(current.warning)) return intervalMinutes * 60;
-
-        return current?.mode === "live" ? liveCheckSeconds : idleHeadCheckSeconds;
+        return current.status === "failed"
+          ? current.problem
+          : current.status === "loaded"
+            ? current.warning
+            : undefined;
       };
 
+      const nextCheckInSeconds = () => {
+        if (problemNow()?.cause === "rate-limit") return intervalMinutes * 60;
+
+        return loaded()?.mode === "live" ? liveCheckSeconds : idleHeadCheckSeconds;
+      };
+
+      // A problem waiting for the user, such as gh signed out, would only fail again: checks stop until the
+      // user checks again, or something new follows the watch, such as its dashboard being opened.
       const schedule = () => {
         clearTimeout(timer);
-        if (watchers > 0) timer = setTimeout(() => void check(checkChanges), nextCheckInSeconds() * 1000);
+        if (watchers > 0 && !problemNow()?.waitsForUser)
+          timer = setTimeout(() => void check(checkChanges), nextCheckInSeconds() * 1000);
       };
 
       const check = (how: () => Promise<void>) =>
         (checking ??= how()
           .catch((error) => {
             const previous = loaded();
-            const message = messageOf(error);
+            const problem = ghProblemOf(messageOf(error), watch.repository);
 
-            runInAction(() =>
-              state.set(
-                previous
-                  ? {
-                      ...previous,
-                      warning: isRateLimit(message)
-                        ? `GitHub's rate limit is reached; checking again in ${intervalMinutes} min.`
-                        : message,
-                    }
-                  : { status: "failed", message },
-              ),
-            );
+            runInAction(() => state.set(previous ? { ...previous, warning: problem } : { status: "failed", problem }));
           })
           .finally(() => {
             checking = undefined;
@@ -158,7 +157,7 @@ export const trackActivityInjectable = getInjectable2({
          */
         watch: (isBusy?: () => boolean) => {
           if (isBusy) busyWatchers.add(isBusy);
-          if (watchers++ === 0) void check(loaded() ? checkChanges : checkAll);
+          if (watchers++ === 0 || problemNow()?.waitsForUser) void check(loaded() ? checkChanges : checkAll);
 
           return () => {
             if (isBusy) busyWatchers.delete(isBusy);

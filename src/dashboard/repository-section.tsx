@@ -14,6 +14,7 @@ import { clusterRetrySeconds } from "../deployments/cluster-images.injectable";
 import { liveCheckSeconds } from "../workflow-runs/track-activity.injectable";
 import { versionsAsked, versionsWithRuns } from "../workflow-runs/track-sources.injectable";
 import { gitOpsSyncsTableKind } from "./gitops-syncs-table.injectable";
+import { GhProblemNotice } from "./gh-problem-notice";
 import { Panel } from "./panel";
 import { servicesTableKind } from "./services-table.injectable";
 import { StatCard } from "./stat-card";
@@ -64,16 +65,13 @@ export const RepositorySection = observer(({ clusterId, watch }: { clusterId: st
 
       {activity.status === "failed" && (
         <Panel>
-          <Span $color="critical">
-            Could not read {watch.repository} from GitHub: {activity.message}
-          </Span>
-          <Span $color="textMuted">This needs the GitHub CLI (gh) installed and signed in with "gh auth login".</Span>
+          <GhProblemNotice problem={activity.problem} hadData={false} />
         </Panel>
       )}
 
       {activity.status === "loaded" && activity.warning && (
         <Panel>
-          <Span $color="warning">{activity.warning}</Span>
+          <GhProblemNotice problem={activity.warning} hadData />
         </Panel>
       )}
 

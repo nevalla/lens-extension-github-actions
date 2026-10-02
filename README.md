@@ -30,4 +30,6 @@ While the dashboard is open, the cluster is followed live, and GitHub is checked
 
 The workflow runs are read with the [GitHub CLI](https://cli.github.com/). Install it and sign in with `gh auth login` before using the dashboard.
 
+When reading GitHub fails, the dashboard says why and what to do: gh not installed or not found by Lens (restart Lens after installing it, so it picks up your shell's PATH), not signed in or its sign-in expired, an organization requiring single sign-on, a repository or branch not found, GitHub's rate limit, or GitHub not reachable. For what needs you to act, checking pauses until you check again with the refresh button.
+
 What changed in each version is in [CHANGELOG.md](./CHANGELOG.md).
