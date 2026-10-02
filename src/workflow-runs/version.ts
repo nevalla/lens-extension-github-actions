@@ -12,6 +12,8 @@ export interface Version {
   /** When it was committed or published. */
   readonly at: string;
   readonly prerelease?: boolean;
+  /** Who made the commit: their GitHub login, or the name they committed with. */
+  readonly author?: string;
   /** Its page on GitHub. */
   readonly url: string;
 }

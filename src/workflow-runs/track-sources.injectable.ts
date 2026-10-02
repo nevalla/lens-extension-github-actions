@@ -15,11 +15,16 @@ export const versionsWithRuns = 5;
 // Comfortably more than the workflows one commit triggers.
 const runsAskedPerCommit = 30;
 
-const commitsJq = `[.[] | {sha, title: (.commit.message | split("\\n")[0]), committedAt: .commit.committer.date}]`;
+const commitsJq = `[.[] | {sha, title: (.commit.message | split("\\n")[0]), committedAt: .commit.committer.date, author: (.author.login // .commit.author.name)}]`;
 
 const commitJq = `{sha, title: (.commit.message | split("\\n")[0])}`;
 
-const commitSchema = z.object({ sha: z.string(), title: z.string(), committedAt: z.string() });
+const commitSchema = z.object({
+  sha: z.string(),
+  title: z.string(),
+  committedAt: z.string(),
+  author: z.string().nullish(),
+});
 
 const releaseSchema = z.object({
   tagName: z.string(),
@@ -96,6 +101,7 @@ export const trackSourcesInjectable = getInjectable2({
             label: commit.sha.slice(0, 7),
             title: commit.title,
             at: commit.committedAt,
+            author: commit.author ?? undefined,
             url: `https://github.com/${repository}/commit/${commit.sha}`,
           }));
 

@@ -14,6 +14,7 @@ import { watchedRepositoriesStoreInjectable } from "../watched-repositories/watc
 import { HealthBanner } from "./health-banner";
 import { dashboardTabKind } from "./open-dashboard-tab.injectable";
 import { RepositorySection } from "./repository-section";
+import { VersionDetailsPanel } from "./version-details-panel";
 
 const DashboardTitle = observer(({ tabId }: TabProps<typeof mainViewTabHostKind>) => {
   const clusterName = useInject(clusterNameInjectable)(tabId).get();
@@ -57,17 +58,14 @@ const Dashboard = observer(({ tabId }: TabProps<typeof mainViewTabHostKind>) => 
         onSettings={configure}
       />
 
-      {/* The banner stays put; what is below it scrolls within the tab. */}
-      <Div
-        $flex={{ direction: "vertical", gap: "3xl" }}
-        $padding="xxl"
-        $flexChild
-        $overflow={{ y: "auto" }}
-        $style={{ minHeight: 0 }}
-      >
-        {watched.map((watch) => (
-          <RepositorySection key={watchKeyOf(watch)} clusterId={tabId} watch={watch} />
-        ))}
+      {/* The banner stays put; what is below it scrolls within the tab, and a version's details slide in over it. */}
+      <Div $flexChild $relative $style={{ minHeight: 0 }}>
+        <Div $flex={{ direction: "vertical", gap: "3xl" }} $padding="xxl" $height="full" $overflow={{ y: "auto" }}>
+          {watched.map((watch) => (
+            <RepositorySection key={watchKeyOf(watch)} clusterId={tabId} watch={watch} />
+          ))}
+        </Div>
+        <VersionDetailsPanel clusterId={tabId} />
       </Div>
     </Div>
   );

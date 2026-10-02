@@ -1,4 +1,5 @@
-import { A, Code, Div, getTooltipProps, Span } from "@k8slens/element-components";
+import { type $TooltipProps, A, Code, Div, getTooltipProps, Span } from "@k8slens/element-components";
+import type { ReactNode } from "react";
 import {
   getTableColumnInjectableBunch,
   getTableInjectableBunch,
@@ -6,17 +7,15 @@ import {
   type TableColumnCellProps,
 } from "@k8slens/table-contracts";
 import { useInject } from "@k8slens/use-inject";
-import type { VersionSync } from "../deployments/gitops-syncs";
-import type { VersionService } from "../deployments/version-services";
+import { entriesOfVersion, type VersionEntry } from "../deployments/version-entries";
 import { isReleasesWatch, watchOfKey } from "../watched-repositories/watched-repository";
-import { openVersionInjectable } from "../workflow-runs/open-version.injectable";
 import { overallStatusOf } from "../workflow-runs/run-status";
 import { CommitRunsTooltip } from "./commit-runs-tooltip";
 import { formatAge } from "./format-time-ago";
 import { RunStatusIcon } from "./run-status-icon";
 import { ServiceTooltip } from "./service-tooltip";
-import { type DotColor, StatusDot } from "./status-dot";
-import { openWorkflowsModalInjectable } from "./workflows-modal.injectable";
+import { EntryDot } from "./entry-dot";
+import { selectedVersionInjectable } from "./selected-version.injectable";
 import type { VersionRow } from "./watch-on-cluster.injectable";
 import { columnHeader, getWatchRowsBunch, type WatchTableParams } from "./watch-table";
 
@@ -57,102 +56,66 @@ const runsTooltip = (row: Row) =>
     contentProps: { runs: row.runs, runsOn: row.runsOn, others: row.otherRuns.length },
   });
 
-// The CI status leads the version: a column of its own would take a share of the width as wide as any other.
-const VersionCell = ({ row }: CellProps) => {
-  const openVersion = useInject(openVersionInjectable)();
+/** Opens the version's details panel over the dashboard. */
+const SelectLink = ({
+  row,
+  tooltip,
+  children,
+}: {
+  row: Row;
+  tooltip: string | $TooltipProps<any>;
+  children: ReactNode;
+}) => {
+  const selected = useInject(selectedVersionInjectable)(row.clusterId);
 
   return (
-    <Div $flex={{ direction: "horizontal", gap: "s", verticalAlign: "center" }}>
-      {row.runs.length > 0 && (
-        <Div $tooltip={runsTooltip(row)}>
-          <RunStatusIcon status={overallStatusOf(row.runs)} />
-        </Div>
-      )}
-      <A
-        onClick={() => void openVersion(row.version)}
-        $tooltip={row.version.prerelease ? "Pre-release · open on GitHub" : "Open on GitHub"}
-        $color="link"
-      >
-        <Code>{row.version.label}</Code>
-      </A>
-    </Div>
+    <A
+      onClick={() => selected.select({ watchKey: row.watchKey, versionId: row.version.id })}
+      $tooltip={tooltip}
+      $color="link"
+    >
+      {children}
+    </A>
   );
 };
+
+// The CI status leads the version: a column of its own would take a share of the width as wide as any other.
+const VersionCell = ({ row }: CellProps) => (
+  <Div $flex={{ direction: "horizontal", gap: "s", verticalAlign: "center" }}>
+    {row.runs.length > 0 && (
+      <Div $tooltip={runsTooltip(row)}>
+        <RunStatusIcon status={overallStatusOf(row.runs)} />
+      </Div>
+    )}
+    <SelectLink row={row} tooltip={row.version.prerelease ? "Pre-release · show its details" : "Show its details"}>
+      <Code>{row.version.label}</Code>
+    </SelectLink>
+  </Div>
+);
 
 const TitleCell = ({ row }: CellProps) =>
   row.version.title !== row.version.label ? <Span $tooltip={row.version.title}>{row.version.title}</Span> : null;
 
-// Clicking it shows the version's workflows and their jobs, over the dashboard.
 const ChecksCell = ({ row }: CellProps) => {
-  const openWorkflowsModal = useInject(openWorkflowsModalInjectable)();
-
   if (row.runs.length === 0 && row.otherRuns.length === 0) return <Span $color="textMuted">—</Span>;
 
   const others = row.otherRuns.length;
 
   return (
-    <A
-      onClick={() => void openWorkflowsModal(row.clusterId, row.watchKey, row.version.id)}
-      $tooltip={runsTooltip(row)}
-      $color="link"
-    >
+    <SelectLink row={row} tooltip={runsTooltip(row)}>
       {/* Only what the version started counts; GitHub's own runs recorded against it do not. */}
       {row.runs.length > 0
         ? `${row.runs.filter((run) => run.conclusion === "success").length}/${row.runs.length} passed`
         : `${others} other ${others === 1 ? "run" : "runs"}`}
       {row.runsOn && <Span $color="textMuted"> · on {row.runsOn}</Span>}
-    </A>
+    </SelectLink>
   );
 };
 
-const dotColors: Record<VersionService["state"], DotColor> = {
-  running: "success",
-  "rolling-out": "primary",
-  "picked-up": "notice",
-  failed: "critical",
-};
-
-const serviceStateLabels: Record<VersionService["state"], string> = {
-  running: "running",
-  "rolling-out": "rolling out",
-  "picked-up": "picked up by Flux",
-  failed: "failed to apply",
-};
-
-const syncStateLabels: Record<VersionSync["state"], string> = {
-  running: "applied",
-  "rolling-out": "applying",
-  "picked-up": "fetched, not applied yet",
-  failed: "failed to apply",
-};
-
-/** A service, a Kustomization or an Application in the cell, with what its dot means. */
-interface Entry {
-  readonly name: string;
-  readonly state: VersionService["state"];
-  readonly label: string;
-}
-
-const entriesOf = (row: Row): Entry[] => [
-  ...(row.services ?? []).map(({ name, state }) => ({ name, state, label: serviceStateLabels[state] })),
-  ...(row.syncs ?? []).map(({ name, state, sync }) => ({
-    name,
-    state,
-    label: `${sync.resource.kind} ${syncStateLabels[state]}`,
-  })),
-];
-
-const EntryDot = ({ entry }: { entry: Entry }) => (
-  <Div $flex={{ direction: "horizontal", gap: "xxs", verticalAlign: "center" }}>
-    <StatusDot color={dotColors[entry.state]} />
-    <Span>{entry.name}</Span>
-  </Div>
-);
-
-const EntriesTooltip = ({ entries }: { entries: readonly Entry[] }) => (
+const EntriesTooltip = ({ entries }: { entries: readonly VersionEntry[] }) => (
   <Div $flex={{ direction: "vertical", gap: "xs" }}>
     {entries.map((entry) => (
-      <Div key={entry.name} $flex={{ direction: "horizontal", gap: "s", verticalAlign: "center" }}>
+      <Div key={`${entry.label}:${entry.name}`} $flex={{ direction: "horizontal", gap: "s", verticalAlign: "center" }}>
         <EntryDot entry={entry} />
         <Span $color="textMuted">{entry.label}</Span>
       </Div>
@@ -162,7 +125,7 @@ const EntriesTooltip = ({ entries }: { entries: readonly Entry[] }) => (
 
 // One line, as every row of a table is: the first service, Kustomization or Application, and how many more, all of them on hover.
 const InClusterCell = ({ row }: CellProps) => {
-  const entries = entriesOf(row);
+  const entries = entriesOfVersion(row.services, row.syncs);
   const [first, ...others] = entries;
   const [onlyService] = row.services ?? [];
 
