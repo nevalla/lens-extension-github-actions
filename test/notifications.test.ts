@@ -3,6 +3,7 @@ import { carryForward, changesBetween, isNotified, type Reading } from "../src/n
 
 const reading = (overrides: Partial<Reading> = {}): Reading => ({
   failing: new Map(),
+  retrying: new Set(),
   settled: new Map(),
   ...overrides,
 });
@@ -13,7 +14,10 @@ const settled = (entries: Record<string, string>) =>
 describe("changesBetween", () => {
   it("tells nothing at the first reading", () => {
     expect(
-      changesBetween(undefined, reading({ failing: new Map([["api", "boom"]]), unreadable: "socket hang up" })),
+      changesBetween(
+        undefined,
+        reading({ failing: new Map([["api", { message: "boom" }]]), unreadable: "socket hang up" }),
+      ),
     ).toEqual([]);
   });
 
@@ -40,11 +44,11 @@ describe("changesBetween", () => {
 
   it("tells what starts failing, not what already was", () => {
     const changes = changesBetween(
-      reading({ failing: new Map([["api", "old"]]) }),
+      reading({ failing: new Map([["api", { message: "old" }]]) }),
       reading({
         failing: new Map([
-          ["api", "old"],
-          ["Kustomization apps", "health check failed"],
+          ["api", { message: "old" }],
+          ["Kustomization apps", { message: "health check failed" }],
         ]),
       }),
     );
@@ -69,18 +73,63 @@ describe("carryForward", () => {
     expect(changesBetween(rollingOut, after)).toEqual([{ kind: "live", label: "bbbbbbb", services: ["api"] }]);
   });
 
+  it("tells a failure once while it is retried and keeps failing", () => {
+    const name = "Kustomization apps";
+    const failing = reading({ failing: new Map([[name, { message: "health check failed", version: "a" }]]) });
+    const retrying = reading({ retrying: new Set([name]) });
+    const told: unknown[] = [];
+    let previous = carryForward(undefined, reading());
+
+    for (const next of [failing, retrying, failing, retrying, failing]) {
+      told.push(...changesBetween(previous, next));
+      previous = carryForward(previous, next);
+    }
+
+    expect(told).toEqual([{ kind: "failing", name, message: "health check failed" }]);
+  });
+
+  it("tells another version failing while the first one is retried", () => {
+    const name = "Kustomization apps";
+    const onA = reading({ failing: new Map([[name, { message: "health check failed", version: "a" }]]) });
+    const onB = reading({ failing: new Map([[name, { message: "health check failed", version: "b" }]]) });
+    const retrying = reading({ retrying: new Set([name]) });
+    const told: unknown[] = [];
+    let previous = carryForward(undefined, reading());
+
+    for (const next of [onA, retrying, onA, retrying, onB, retrying, onB]) {
+      told.push(...changesBetween(previous, next));
+      previous = carryForward(previous, next);
+    }
+
+    expect(told).toHaveLength(2);
+  });
+
+  it("tells a failure again once it recovered in between", () => {
+    const name = "Kustomization apps";
+    const failing = reading({ failing: new Map([[name, { message: "health check failed", version: "a" }]]) });
+    const told: unknown[] = [];
+    let previous = carryForward(undefined, reading());
+
+    for (const next of [failing, reading(), failing]) {
+      told.push(...changesBetween(previous, next));
+      previous = carryForward(previous, next);
+    }
+
+    expect(told).toHaveLength(2);
+  });
+
   it("takes nothing as the baseline while the first reading could not be read", () => {
     const unreadableFirst = carryForward(undefined, reading({ unreadable: "socket hang up" }));
-    const readable = reading({ failing: new Map([["api", "boom"]]) });
+    const readable = reading({ failing: new Map([["api", { message: "boom" }]]) });
 
     expect(unreadableFirst).toBeUndefined();
     expect(changesBetween(unreadableFirst, readable)).toEqual([]);
   });
 
   it("does not tell again of failures known before the cluster could not be read", () => {
-    const failing = reading({ failing: new Map([["api", "boom"]]) });
+    const failing = reading({ failing: new Map([["api", { message: "boom" }]]) });
     const unreadable = carryForward(failing, reading({ unreadable: "socket hang up" }));
-    const recovered = carryForward(unreadable, reading({ failing: new Map([["api", "boom"]]) }));
+    const recovered = carryForward(unreadable, reading({ failing: new Map([["api", { message: "boom" }]]) }));
 
     expect(changesBetween(failing, unreadable)).toEqual([{ kind: "unreadable", message: "socket hang up" }]);
     expect(changesBetween(unreadable, recovered)).toEqual([]);
