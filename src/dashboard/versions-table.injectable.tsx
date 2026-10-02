@@ -46,7 +46,8 @@ export const versionsTable = getTableInjectableBunch({
 
 type CellProps = TableColumnCellProps<Row>;
 
-const runsTooltip = (row: Row) => getTooltipProps({ Content: CommitRunsTooltip, contentProps: { runs: row.runs } });
+const runsTooltip = (row: Row) =>
+  getTooltipProps({ Content: CommitRunsTooltip, contentProps: { runs: row.runs, runsOn: row.runsOn } });
 
 // The CI status leads the version: a column of its own would take a share of the width as wide as any other.
 const VersionCell = ({ row }: CellProps) => {
@@ -79,6 +80,7 @@ const ChecksCell = ({ row }: CellProps) =>
   ) : (
     <Span $tooltip={runsTooltip(row)}>
       {row.runs.filter((run) => run.conclusion === "success").length}/{row.runs.length} passed
+      {row.runsOn && <Span $color="textMuted"> · on {row.runsOn}</Span>}
     </Span>
   );
 

@@ -19,11 +19,17 @@ export interface VersionRuns {
   readonly version: Version;
   /** The newest run of each workflow, by workflow name. */
   readonly runs: readonly WorkflowRun[];
+  /**
+   * The branch the runs ran on, when they are not the version's own: a release with no runs of its own
+   * shows those of the commit it was tagged on, as a repository that builds on its default branch has.
+   */
+  readonly runsOn?: string;
 }
 
 /** A version with the runs GitHub lists for it, newest first. */
-export const toVersionRuns = (version: Version, newestFirst: readonly WorkflowRun[]): VersionRuns => ({
+export const toVersionRuns = (version: Version, newestFirst: readonly WorkflowRun[], runsOn?: string): VersionRuns => ({
   version,
+  runsOn,
   // A workflow run again on the same commit replaces what it said before.
   runs: newestFirst
     .filter((run, index) => newestFirst.findIndex((each) => each.workflowName === run.workflowName) === index)

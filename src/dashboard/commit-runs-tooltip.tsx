@@ -3,8 +3,9 @@ import { runStatusOf } from "../workflow-runs/run-status";
 import type { WorkflowRun } from "../workflow-runs/workflow-run";
 import { RunStatusIcon } from "./run-status-icon";
 
-export const CommitRunsTooltip = ({ runs }: { runs: readonly WorkflowRun[] }) => (
+export const CommitRunsTooltip = ({ runs, runsOn }: { runs: readonly WorkflowRun[]; runsOn?: string }) => (
   <Div $flex={{ direction: "vertical", gap: "xs" }}>
+    {runsOn && <Span $color="textMuted">Runs of the tagged commit on {runsOn}</Span>}
     {runs.map((run) => {
       const status = runStatusOf(run);
 
