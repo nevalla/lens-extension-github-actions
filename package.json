@@ -1,17 +1,26 @@
 {
-  "name": "github-actions",
-  "version": "0.2.0",
-  "description": "Watch the GitHub Actions workflow runs behind each of your clusters from Lens.",
+  "name": "lens-github-actions",
+  "version": "0.1.0",
+  "description": "See the GitHub Actions runs of your repositories next to what each cluster runs of them: services, Flux image automation, Helm charts and GitOps syncs.",
   "keywords": [
     "lens-extension"
   ],
+  "license": "MIT",
+  "author": "Lauri Nevala <lauri.nevala@gmail.com>",
+  "homepage": "https://github.com/nevalla/lens-extension-github-actions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nevalla/lens-extension-github-actions.git"
+  },
+  "bugs": "https://github.com/nevalla/lens-extension-github-actions/issues",
   "type": "commonjs",
   "main": "./dist/index.js",
   "files": [
     "dist",
     "assets",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "lensExtension": {
     "icon": "assets/icon.svg",
@@ -19,6 +28,7 @@
   },
   "scripts": {
     "build": "lens-types-check && lens-package-build --entry-point ./src/index.ts",
+    "prepublishOnly": "npm run build",
     "clean": "rimraf dist/",
     "test": "vitest run"
   },
