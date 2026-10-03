@@ -158,15 +158,16 @@ export const trackSourcesInjectable = getInjectable2({
         return commit;
       };
 
-      // Asked once: the branch a repository builds on when its releases have no runs of their own.
+      // Asked once: the branch a repository builds on when its releases have no runs of their own. A lookup
+      // that failed fails the check, to be asked again: taken for no runs, the release would keep showing none.
       let defaultBranch: Promise<string | undefined> | undefined;
       const defaultBranchOf = () =>
         (defaultBranch ??= gh(`repo view ${shellQuote(repository)} --json defaultBranchRef --jq .defaultBranchRef.name`)
           .then((name) => name.trim() || undefined)
-          .catch(() => {
+          .catch((error: unknown) => {
             defaultBranch = undefined;
 
-            return undefined;
+            throw error;
           }));
 
       // A release's own name is usually its tag, so what it says is the message of the commit it points to.

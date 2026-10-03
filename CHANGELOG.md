@@ -2,6 +2,11 @@
 
 What changed in each version of this extension, newest first.
 
+## 0.2.0
+
+- The services list of the dashboard shows as soon as the cluster is read, rather than only after leaving the dashboard and coming back.
+- A release without runs of its own no longer shows no workflows when the repository's default branch could not be read: the check fails with a warning and is tried again.
+
 ## 0.1.0
 
 First release.
