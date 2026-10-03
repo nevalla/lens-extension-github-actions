@@ -3,7 +3,7 @@ import { CheckCircleIcon, GitHubIcon, RefreshIcon } from "@k8slens/icon";
 import { Table } from "@k8slens/table-contracts";
 import { useInject } from "@k8slens/use-inject";
 import { observer } from "mobx-react";
-import { useEffect, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo } from "react";
 import {
   followedLabelOf,
   isReleasesWatch,
@@ -24,7 +24,19 @@ import { followWatchInjectable } from "../notifications/follow-watch.injectable"
 import { watchOnClusterInjectable } from "./watch-on-cluster.injectable";
 
 // Lens's tables are as tall as where they are put, so each is given room for its rows, and scrolls past a dozen.
-const tableHeight = (rows: number) => ({ height: 48 * (Math.min(Math.max(rows, 1), 12) + 1) });
+const tableHeight = (rows: number) => 48 * (Math.min(Math.max(rows, 1), 12) + 1);
+
+// Lens's table measures its container when it mounts, and draws no rows into room it gained afterwards:
+// a container that grows is a table mounted anew, which keeps the rows it already has.
+const TableBox = ({ rows, children }: { rows: number; children: ReactNode }) => {
+  const height = tableHeight(rows);
+
+  return (
+    <Div key={height} $style={{ height }}>
+      {children}
+    </Div>
+  );
+};
 
 const checkedLabel = (activity: { mode: "live" | "idle"; checkedAt: Date }) =>
   activity.mode === "live"
@@ -117,9 +129,9 @@ export const RepositorySection = observer(({ clusterId, watch }: { clusterId: st
       </Div>
 
       <Panel heading={releases ? "Recent releases" : "Recent commits"} aside={`last ${versionsWithRuns}`}>
-        <Div $style={tableHeight(rows.length || versionsWithRuns)}>
+        <TableBox rows={rows.length || versionsWithRuns}>
           <Table kind={versionsTableKind} params={params} />
-        </Div>
+        </TableBox>
       </Panel>
 
       {syncs.length > 0 && (
@@ -127,9 +139,9 @@ export const RepositorySection = observer(({ clusterId, watch }: { clusterId: st
           heading={`GitOps syncs (${syncs.length})`}
           aside="Kustomizations and Argo CD Applications applying this branch"
         >
-          <Div $style={tableHeight(syncs.length)}>
+          <TableBox rows={syncs.length}>
             <Table kind={gitOpsSyncsTableKind} params={params} />
-          </Div>
+          </TableBox>
         </Panel>
       )}
 
@@ -140,14 +152,16 @@ export const RepositorySection = observer(({ clusterId, watch }: { clusterId: st
               <Span $color="warning">Could not read what this cluster runs: {cluster.message}</Span>
               <Span $color="textMuted">Trying again every {clusterRetrySeconds} seconds.</Span>
             </Div>
-          ) : summary && summary.services.length === 0 ? (
+          ) : !summary ? (
+            <Span $color="textMuted">Reading what the cluster runs…</Span>
+          ) : summary.services.length === 0 ? (
             <Span $color="textMuted">
               Nothing in this cluster runs a build of the last {versionsAsked} {unit}s.
             </Span>
           ) : (
-            <Div $style={tableHeight(summary?.services.length ?? 3)}>
+            <TableBox rows={summary.services.length}>
               <Table kind={servicesTableKind} params={params} />
-            </Div>
+            </TableBox>
           )}
         </Panel>
       )}
