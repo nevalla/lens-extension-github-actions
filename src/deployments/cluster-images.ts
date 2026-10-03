@@ -15,6 +15,13 @@ export interface Workload {
   readonly images: readonly string[];
   /** Every replica runs the current template. */
   readonly rolledOut: boolean;
+  /** How many of its replicas are ready, of how many it wants. */
+  readonly replicas?: { readonly ready: number; readonly desired: number };
+  /**
+   * When it last settled with every replica updated and available, for a Deployment: after its last rollout,
+   * or after a scale or a replica coming back since, whichever came last.
+   */
+  readonly settledAt?: string;
   readonly owner?: OwnerRef;
 }
 

@@ -7,15 +7,14 @@ import {
   type TableColumnCellProps,
 } from "@k8slens/table-contracts";
 import { useInject } from "@k8slens/use-inject";
-import type { ReactNode } from "react";
-import type { DeployResource, Workload } from "../deployments/cluster-images";
-import { openResourceDetailsInjectable } from "../deployments/open-resource-details.injectable";
+import type { Workload } from "../deployments/cluster-images";
 import { openVersionInjectable } from "../workflow-runs/open-version.injectable";
 import { isReleasesWatch, watchOfKey } from "../watched-repositories/watched-repository";
 import { type ServiceRow, serviceLookOf, serviceStatusOf } from "./flux-stage";
 import { columnHeader, getWatchRowsBunch, type WatchTableParams } from "./watch-table";
 import { ServiceTooltip } from "./service-tooltip";
-import { DeployerIcon } from "./deployer-icon";
+import { DeployerLink } from "./deployer-link";
+import { DetailsLink } from "./details-link";
 
 /** A service with the cluster it runs in, which is what opening its details asks for. */
 interface Row extends ServiceRow {
@@ -57,25 +56,6 @@ const StatusIcon = ({ row }: CellProps) => {
   }
 };
 
-/** A link that opens a workload's, or what deploys it, details in the cluster's view. */
-const DetailsLink = ({
-  clusterId,
-  resource,
-  children,
-}: {
-  clusterId: string;
-  resource: Workload | DeployResource;
-  children: ReactNode;
-}) => {
-  const openResourceDetails = useInject(openResourceDetailsInjectable)();
-
-  return (
-    <A onClick={() => void openResourceDetails(clusterId, resource)} $color="link">
-      {children}
-    </A>
-  );
-};
-
 // The status leads the name: a column of its own would take a share of the width as wide as any other.
 const NameCell = ({ row }: CellProps) => {
   const [workload] = row.workloads;
@@ -113,21 +93,9 @@ const StateCell = ({ row }: CellProps) => (
   <Span $color={serviceLookOf(row) === "failed" ? "critical" : undefined}>{serviceStatusOf(row)}</Span>
 );
 
-const DeployerCell = ({ row }: CellProps) =>
-  row.deployer ? (
-    <Div
-      $flex={{ direction: "horizontal", gap: "xs", verticalAlign: "center" }}
-      $tooltip={row.deployer.message ?? `${row.deployer.kind} ${row.deployer.namespace}/${row.deployer.name}`}
-    >
-      <DeployerIcon state={row.deployer.state} />
-      <DetailsLink clusterId={row.clusterId} resource={row.deployer}>
-        {row.deployer.kind} {row.deployer.name}
-      </DetailsLink>
-      {row.chart?.applied && <Span $color="textMuted">· chart {row.chart.applied}</Span>}
-    </Div>
-  ) : (
-    <Span $color="textMuted">—</Span>
-  );
+const DeployerCell = ({ row }: CellProps) => (
+  <DeployerLink clusterId={row.clusterId} deployer={row.deployer} chart={row.chart?.applied} />
+);
 
 const workloadKindsOf = (workloads: readonly Workload[]) => {
   const counts = new Map<string, number>();

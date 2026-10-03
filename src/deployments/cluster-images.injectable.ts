@@ -39,6 +39,7 @@ import {
   sourceToolkitV1,
   sourceToolkitV1beta2,
 } from "./flux-kinds";
+import { daemonSetStatusOf, deploymentStatusOf, statefulSetStatusOf, type WorkloadStatus } from "./workload-status";
 
 export type ClusterImagesState =
   | { readonly status: "loading" }
@@ -127,7 +128,7 @@ export const clusterImagesInjectable = getInjectable2({
       };
 
       const workloadOf =
-        (kind: Workload["kind"], rolledOutOf: (resource: any) => boolean) =>
+        (kind: Workload["kind"], statusOf: (resource: any) => WorkloadStatus) =>
         (resource: {
           metadata: {
             namespace: string;
@@ -136,16 +137,22 @@ export const clusterImagesInjectable = getInjectable2({
             annotations?: Record<string, string>;
           };
           spec: { template?: Template };
-        }): Workload[] => [
-          {
-            kind,
-            namespace: resource.metadata.namespace,
-            name: resource.metadata.name,
-            images: imagesOf(resource.spec.template),
-            rolledOut: rolledOutOf(resource),
-            owner: ownerOfWorkload(resource.metadata, resource.spec.template?.metadata?.labels),
-          },
-        ];
+        }): Workload[] => {
+          const { rolledOut, ready, desired, settledAt } = statusOf(resource);
+
+          return [
+            {
+              kind,
+              namespace: resource.metadata.namespace,
+              name: resource.metadata.name,
+              images: imagesOf(resource.spec.template),
+              rolledOut,
+              replicas: { ready, desired },
+              settledAt,
+              owner: ownerOfWorkload(resource.metadata, resource.spec.template?.metadata?.labels),
+            },
+          ];
+        };
 
       const fluxResourceOf =
         (kind: DeployResource["kind"], apiVersion: DeployResource["apiVersion"]) =>
@@ -263,38 +270,9 @@ export const clusterImagesInjectable = getInjectable2({
             gitSources,
             applications,
           ] = await Promise.all([
-            follow(
-              kubeResources(deploymentKind, appsV1, clusterId),
-              workloadOf("Deployment", (deployment) => {
-                const replicas = deployment.spec.replicas ?? 1;
-                const status = deployment.status ?? {};
-
-                return (
-                  (status.observedGeneration ?? 0) >= (deployment.metadata.generation ?? 0) &&
-                  (status.updatedReplicas ?? 0) === replicas &&
-                  (status.availableReplicas ?? 0) >= replicas
-                );
-              }),
-            ),
-            follow(
-              kubeResources(statefulSetKind, appsV1, clusterId),
-              workloadOf("StatefulSet", (statefulSet) => {
-                const replicas = statefulSet.spec.replicas ?? 1;
-
-                return (
-                  (statefulSet.status?.updatedReplicas ?? 0) === replicas &&
-                  (statefulSet.status?.readyReplicas ?? 0) === replicas
-                );
-              }),
-            ),
-            follow(
-              kubeResources(daemonSetKind, appsV1, clusterId),
-              workloadOf("DaemonSet", ({ status }) => {
-                const desired = status?.desiredNumberScheduled ?? 0;
-
-                return (status?.updatedNumberScheduled ?? 0) === desired && (status?.numberAvailable ?? 0) === desired;
-              }),
-            ),
+            follow(kubeResources(deploymentKind, appsV1, clusterId), workloadOf("Deployment", deploymentStatusOf)),
+            follow(kubeResources(statefulSetKind, appsV1, clusterId), workloadOf("StatefulSet", statefulSetStatusOf)),
+            follow(kubeResources(daemonSetKind, appsV1, clusterId), workloadOf("DaemonSet", daemonSetStatusOf)),
             // Flux and each of its parts are optional, and served in versions that depend on Flux's.
             followOptional(
               () => follow(kubeResources(imagePolicyKind, imageToolkitV1, clusterId), imageSelectionOf),

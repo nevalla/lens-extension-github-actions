@@ -1,17 +1,18 @@
 import { DrawerItem, NoItemsDetailItem } from "@k8slens/details-panel-components";
 import { A, Button, Div, Span } from "@k8slens/element-components";
 import { ArrowOutwardIcon, CloseIcon, FullscreenIcon } from "@k8slens/icon";
+import { Table } from "@k8slens/table-contracts";
 import { useInject } from "@k8slens/use-inject";
 import { observer } from "mobx-react";
-import { type ReactNode, useEffect } from "react";
-import { openResourceDetailsInjectable } from "../deployments/open-resource-details.injectable";
-import { entriesOfVersion } from "../deployments/version-entries";
+import { type ReactNode, useEffect, useMemo } from "react";
+import { resourcesOfVersion } from "../deployments/version-resources";
 import { isReleasesWatch, watchOfKey } from "../watched-repositories/watched-repository";
 import { openVersionInjectable } from "../workflow-runs/open-version.injectable";
 import { workflowsTitleOf } from "../workflow-runs/version";
-import { EntryDot } from "./entry-dot";
 import { formatAge } from "./format-time-ago";
 import { selectedVersionInjectable } from "./selected-version.injectable";
+import { TableBox } from "./table-box";
+import { versionResourcesTableKind } from "./version-resources-table.injectable";
 import { watchOnClusterInjectable } from "./watch-on-cluster.injectable";
 import { WorkflowRunCards } from "./workflow-run-cards";
 import { openWorkflowsTabInjectable } from "./workflows-tab.injectable";
@@ -43,7 +44,10 @@ const VersionDetails = observer(
     const selected = useInject(selectedVersionInjectable)(clusterId);
     const openVersion = useInject(openVersionInjectable)();
     const openWorkflowsTab = useInject(openWorkflowsTabInjectable)();
-    const openResourceDetails = useInject(openResourceDetailsInjectable)();
+    const params = useMemo(
+      (): [string, string, string] => [clusterId, watchKey, versionId],
+      [clusterId, watchKey, versionId],
+    );
     const watch = watchOfKey(watchKey);
     const releases = isReleasesWatch(watch);
     const row = watchState.rows.find((each) => each.version.id === versionId);
@@ -57,7 +61,7 @@ const VersionDetails = observer(
     }
 
     const { version } = row;
-    const entries = entriesOfVersion(row.services, row.syncs);
+    const resources = resourcesOfVersion(row.services, row.syncs).length;
 
     return (
       <>
@@ -105,28 +109,12 @@ const VersionDetails = observer(
           <Section heading="On this cluster">
             {!row.services ? (
               <NoItemsDetailItem>Reading what the cluster runs…</NoItemsDetailItem>
-            ) : entries.length === 0 ? (
+            ) : resources === 0 ? (
               <NoItemsDetailItem>Nothing in this cluster runs it.</NoItemsDetailItem>
             ) : (
-              entries.map((entry) => (
-                <DrawerItem
-                  key={`${entry.label}:${entry.name}`}
-                  name={
-                    entry.resource ? (
-                      <A
-                        onClick={() => entry.resource && void openResourceDetails(clusterId, entry.resource)}
-                        $color="link"
-                      >
-                        <EntryDot entry={entry} />
-                      </A>
-                    ) : (
-                      <EntryDot entry={entry} />
-                    )
-                  }
-                >
-                  {entry.label}
-                </DrawerItem>
-              ))
+              <TableBox rows={resources}>
+                <Table kind={versionResourcesTableKind} params={params} />
+              </TableBox>
             )}
           </Section>
 
