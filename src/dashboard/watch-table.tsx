@@ -12,32 +12,33 @@ type WatchOnCluster = ReturnType<ReturnType<(typeof watchOnClusterInjectable)["i
  * The rows of a table of one watch on one cluster, pushed as they change for as long as the table is
  * on screen: `rowsOf` picks them, undefined while there are none to show yet.
  */
-export const getWatchRowsBunch = <Row,>(
+export const getWatchRowsBunch = <Row, Params extends [...WatchTableParams, ...string[]] = WatchTableParams>(
   id: string,
-  rowsOf: (watchState: WatchOnCluster, clusterId: string, watchKey: string) => readonly Row[] | undefined,
+  rowsOf: (watchState: WatchOnCluster, ...params: Params) => readonly Row[] | undefined,
 ) =>
-  getSubscribableInjectableBunch<readonly Row[], WatchTableParams>()({
+  getSubscribableInjectableBunch<readonly Row[], Params>()({
     id,
     source: {
       instantiate: (di) => {
         const watchOnCluster = di.inject(watchOnClusterInjectable);
 
-        return () => (clusterId, watchKey) => ({
-          start: ({ push }) => {
-            const watchState = watchOnCluster(clusterId, watchKey);
-            const stopWatching = watchState.watch();
-            const stopPushing = reaction(
-              () => rowsOf(watchState, clusterId, watchKey),
-              (rows) => rows && push(rows),
-              { fireImmediately: true },
-            );
+        return () =>
+          (...params) => ({
+            start: ({ push }) => {
+              const watchState = watchOnCluster(params[0], params[1]);
+              const stopWatching = watchState.watch();
+              const stopPushing = reaction(
+                () => rowsOf(watchState, ...params),
+                (rows) => rows && push(rows),
+                { fireImmediately: true },
+              );
 
-            return () => {
-              stopPushing();
-              stopWatching();
-            };
-          },
-        });
+              return () => {
+                stopPushing();
+                stopWatching();
+              };
+            },
+          });
       },
     },
   });

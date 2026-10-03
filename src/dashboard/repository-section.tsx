@@ -3,7 +3,7 @@ import { CheckCircleIcon, GitHubIcon, RefreshIcon } from "@k8slens/icon";
 import { Table } from "@k8slens/table-contracts";
 import { useInject } from "@k8slens/use-inject";
 import { observer } from "mobx-react";
-import { type ReactNode, useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import {
   followedLabelOf,
   isReleasesWatch,
@@ -19,24 +19,10 @@ import { GhProblemNotice } from "./gh-problem-notice";
 import { Panel } from "./panel";
 import { servicesTableKind } from "./services-table.injectable";
 import { StatCard } from "./stat-card";
+import { TableBox } from "./table-box";
 import { versionsTableKind } from "./versions-table.injectable";
 import { followWatchInjectable } from "../notifications/follow-watch.injectable";
 import { watchOnClusterInjectable } from "./watch-on-cluster.injectable";
-
-// Lens's tables are as tall as where they are put, so each is given room for its rows, and scrolls past a dozen.
-const tableHeight = (rows: number) => 48 * (Math.min(Math.max(rows, 1), 12) + 1);
-
-// Lens's table measures its container when it mounts, and draws no rows into room it gained afterwards:
-// a container that grows is a table mounted anew, which keeps the rows it already has.
-const TableBox = ({ rows, children }: { rows: number; children: ReactNode }) => {
-  const height = tableHeight(rows);
-
-  return (
-    <Div key={height} $style={{ height }}>
-      {children}
-    </Div>
-  );
-};
 
 const checkedLabel = (activity: { mode: "live" | "idle"; checkedAt: Date }) =>
   activity.mode === "live"
