@@ -106,10 +106,10 @@ describe("releases and their runs", () => {
     conclusion,
   });
 
-  const sourceRunning = (runs: object[]) => {
+  const sourceRunning = (runs: object[], defaultBranch = async () => "main\n") => {
     const gh = async (command: string) => {
       if (command.includes("release list")) return releases;
-      if (command.includes("repo view")) return "main\n";
+      if (command.includes("repo view")) return defaultBranch();
       if (command.includes("run list")) return JSON.stringify(runs);
       if (command.includes("/commits/")) return JSON.stringify({ sha, title: "chore(main): release 1.2.0" });
       throw new Error(`unexpected ${command}`);
@@ -138,6 +138,22 @@ describe("releases and their runs", () => {
     ]).all();
 
     expect(recent[0].runs.map((each: { workflowName: string }) => each.workflowName)).toEqual(["ci", "CodeQL"]);
+    expect(recent[0].runsOn).toBe("main");
+  });
+
+  it("fails, to be asked again, when the default branch could not be read, rather than show no runs", async () => {
+    let calls = 0;
+    const source = sourceRunning([run("ci", "main")], async () => {
+      if (calls++ === 0) throw new Error("gh: connection reset");
+
+      return "main\n";
+    });
+
+    await expect(source.all()).rejects.toThrow("connection reset");
+
+    const { recent } = await source.all();
+
+    expect(recent[0].runs.map((each: { workflowName: string }) => each.workflowName)).toEqual(["ci"]);
     expect(recent[0].runsOn).toBe("main");
   });
 
