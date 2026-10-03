@@ -5,7 +5,6 @@ What changed in each version of this extension, newest first.
 ## 0.2.0
 
 - The details panel of a commit or release lists what of the cluster runs it as Lens lists workloads: each workload with its namespace, ready pods, how long it has been stable and its status, and the Flux or Argo CD resource that deploys it, with its chart version; and the Kustomizations and Argo CD Applications applying it.
-- The services list of the dashboard shows as soon as the cluster is read, rather than only after leaving the dashboard and coming back.
 - A release without runs of its own no longer shows no workflows when the repository's default branch could not be read: the check fails with a warning and is tried again.
 
 ## 0.1.0
