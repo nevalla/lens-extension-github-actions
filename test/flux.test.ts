@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { fluxOwnerOf, fluxStateOf } from "../src/deployments/cluster-images";
+import { fluxOwnerOf, fluxStateOf, withFailingDependencies } from "../src/deployments/cluster-images";
 import { commitOfRevision, githubRepositoryOfUrl, selectedImageOf } from "../src/deployments/flux-kinds";
-import { sha } from "./fixtures";
+import { kustomization, sha } from "./fixtures";
 
 describe("fluxStateOf", () => {
   it.each([
@@ -98,5 +98,54 @@ describe("selectedImageOf", () => {
 
   it("is nothing before anything was selected", () => {
     expect(selectedImageOf()).toBeUndefined();
+  });
+});
+
+describe("waiting for what a Flux resource depends on", () => {
+  const waiting = (name: string, dependsOn: string[]) =>
+    kustomization(name, {
+      ...fluxStateOf([
+        {
+          type: "Ready",
+          status: "False",
+          reason: "DependencyNotReady",
+          message: "dependency 'flux-system/system' is not ready",
+        },
+      ]),
+      dependsOn: dependsOn.map((each) => ({ kind: "Kustomization", namespace: "flux-system", name: each })),
+    });
+
+  it("is applying, not failing, while what it waits for is only being applied", () => {
+    const system = kustomization("system", { state: "reconciling" });
+    const [, gateway] = withFailingDependencies([system, waiting("gateway", ["system"])]);
+
+    expect(gateway.state).toBe("reconciling");
+    expect(gateway.message).toBe("dependency 'flux-system/system' is not ready");
+  });
+
+  it("fails with what it waits for, named along the chain", () => {
+    const system = kustomization("system", { state: "failed", message: "kustomize build failed" });
+    const resources = withFailingDependencies([
+      system,
+      waiting("infra", ["system"]),
+      { ...waiting("gateway", ["infra"]), attemptedCommit: sha("old") },
+    ]);
+
+    expect(resources[2]).toMatchObject({
+      state: "failed",
+      message: "Waiting for flux-system/system, which fails to apply: kustomize build failed",
+    });
+    // What it tried last is what it had applied: failing now is of the commit its source has.
+    expect(resources[2].attemptedCommit).toBeUndefined();
+  });
+
+  it("fails when what it waits for is not found, and stops at a loop", () => {
+    expect(withFailingDependencies([waiting("gateway", ["gone"])])[0].message).toBe(
+      "Waiting for flux-system/gone, which is not found",
+    );
+    expect(withFailingDependencies([waiting("a", ["b"]), waiting("b", ["a"])]).map((each) => each.state)).toEqual([
+      "reconciling",
+      "reconciling",
+    ]);
   });
 });

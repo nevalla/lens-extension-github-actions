@@ -18,6 +18,7 @@ import {
   type GitSource,
   type HelmChart,
   fluxStateOf,
+  withFailingDependencies,
   type ImageAutomation,
   type ImageSelection,
   type Workload,
@@ -169,7 +170,10 @@ export const clusterImagesInjectable = getInjectable2({
         (kind: DeployResource["kind"], apiVersion: DeployResource["apiVersion"]) =>
         (resource: {
           metadata: { namespace: string; name: string };
-          spec?: { sourceRef?: { kind: string; name: string; namespace?: string } };
+          spec?: {
+            sourceRef?: { kind: string; name: string; namespace?: string };
+            dependsOn?: readonly { name: string; namespace?: string }[];
+          };
           status?: {
             conditions?: readonly any[];
             lastAppliedRevision?: string;
@@ -187,6 +191,12 @@ export const clusterImagesInjectable = getInjectable2({
               namespace: resource.metadata.namespace,
               name: resource.metadata.name,
               ...fluxStateOf(status.conditions),
+              // What it depends on is of its own kind, in its own namespace unless it says another.
+              dependsOn: resource.spec?.dependsOn?.map((dependency) => ({
+                kind,
+                name: dependency.name,
+                namespace: dependency.namespace ?? resource.metadata.namespace,
+              })),
               revision: status.lastAppliedRevision ?? status.lastAttemptedRevision,
               sourceRef:
                 kind === "Kustomization" && resource.spec?.sourceRef
@@ -375,7 +385,7 @@ export const clusterImagesInjectable = getInjectable2({
               loaded.pods.get(),
             ),
             imageSelections: loaded.imageSelections.get(),
-            deployResources: loaded.deployResources.flatMap((source) => source.get()),
+            deployResources: withFailingDependencies(loaded.deployResources.flatMap((source) => source.get())),
             imageAutomations: loaded.imageAutomations.get(),
             helmCharts: loaded.helmCharts.get(),
             gitSources: loaded.gitSources.get(),

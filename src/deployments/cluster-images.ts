@@ -53,6 +53,13 @@ export interface DeployResource extends OwnerRef {
   readonly appliedCommit?: string;
   readonly attemptedCommit?: string;
   readonly state: "ready" | "reconciling" | "failed";
+  /**
+   * For a Flux resource: those of its kind it depends on, which Flux applies it only after. While one of
+   * them is not ready, it waits; it is failing only when what it waits for is.
+   */
+  readonly dependsOn?: readonly OwnerRef[];
+  /** It waits for what it depends on, rather than failing itself. */
+  readonly waitsForDependency?: boolean;
   readonly message?: string;
   readonly revision?: string;
 }
@@ -111,16 +118,61 @@ export const fluxOwnerOf = (labels: Readonly<Record<string, string>> = {}): Owne
   return undefined;
 };
 
-export const fluxStateOf = (conditions: readonly Condition[] = []): Pick<DeployResource, "state" | "message"> => {
+export const fluxStateOf = (
+  conditions: readonly Condition[] = [],
+): Pick<DeployResource, "state" | "message" | "waitsForDependency"> => {
   const ready = conditions.find((condition) => condition.type === "Ready");
   const reconciling = conditions.find((condition) => condition.type === "Reconciling" && condition.status === "True");
 
+  // Waiting for what it depends on is not failing: it applies once that is ready, if it gets ready.
+  if (ready?.status === "False" && ready.reason === "DependencyNotReady")
+    return { state: "reconciling", message: ready.message, waitsForDependency: true };
   // Reconciling again after failing is failing, retried: Flux says so with "ProgressingWithRetry".
   if (reconciling?.reason === "ProgressingWithRetry" && ready?.status === "False")
     return { state: "failed", message: ready.message };
   if (reconciling || !ready || ready.status === "Unknown") return { state: "reconciling", message: ready?.message };
 
   return { state: ready.status === "True" ? "ready" : "failed", message: ready.message };
+};
+
+/**
+ * Flux resources waiting for something they depend on that fails to apply, or is not there, as failing
+ * with it: what fails is named, along the chain when what it waits for waits too. Waiting for something only
+ * being applied stays waiting.
+ */
+export const withFailingDependencies = (resources: readonly DeployResource[]): DeployResource[] => {
+  const find = (ref: OwnerRef) => resources.find((each) => each.kind === ref.kind && isSameOwner(each, ref));
+
+  /** Why it cannot be applied, when that is something failing rather than something to wait for. */
+  const failureOf = (resource: DeployResource, seen: ReadonlySet<DeployResource>): string | undefined => {
+    if (!resource.waitsForDependency)
+      return resource.state === "failed"
+        ? `${resource.namespace}/${resource.name}, which fails to apply: ${resource.message ?? "no message"}`
+        : undefined;
+
+    for (const ref of resource.dependsOn ?? []) {
+      const dependency = find(ref);
+
+      // Not found may be not listed, for someone who cannot see its namespace: it is not said to be absent.
+      if (!dependency) return `${ref.namespace}/${ref.name}, which is not found`;
+      if (seen.has(dependency)) continue;
+
+      const failure = failureOf(dependency, new Set([...seen, dependency]));
+
+      if (failure) return failure;
+    }
+
+    return undefined;
+  };
+
+  return resources.map((resource) => {
+    const failure = resource.waitsForDependency ? failureOf(resource, new Set([resource])) : undefined;
+
+    // It tried no revision while waiting: what it fails to apply is what its source has, not what it tried last.
+    return failure
+      ? { ...resource, state: "failed", attemptedCommit: undefined, message: `Waiting for ${failure}` }
+      : resource;
+  });
 };
 
 // Argo CD's tracking may not say which namespace an Application is in, and then its name alone tells it.
