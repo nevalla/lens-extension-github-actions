@@ -81,6 +81,7 @@ export const run = (
   databaseId,
   workflowName,
   headBranch: "main",
+  headSha: "0".repeat(40),
   event: "push",
   status,
   conclusion,
