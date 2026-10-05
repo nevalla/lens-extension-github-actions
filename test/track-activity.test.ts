@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { watchKeyOf } from "../src/watched-repositories/watched-repository";
 import { trackActivityInjectable } from "../src/workflow-runs/track-activity.injectable";
-import { commit } from "./fixtures";
+import { commit, run } from "./fixtures";
 
 const settle = () => vi.advanceTimersByTimeAsync(0);
 
@@ -80,5 +80,38 @@ describe("checking when gh fails", () => {
 
     expect(activity.state.warning?.cause).toBe("offline");
     expect(calls).toBeGreaterThan(callsWhileOffline);
+  });
+});
+
+describe("versions GitHub said have no runs", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("are asked again every few minutes between full checks, as the answer may have been wrong", async () => {
+    const version = commit("aaaaaaa");
+    let runsOfCalls = 0;
+    const source = {
+      headOf: async () => version.id,
+      all: async () => ({ versions: [version], recent: [{ version, runs: [], otherRuns: [] }] }),
+      runsOf: async () => {
+        runsOfCalls++;
+
+        return { version, runs: [run("ci")], otherRuns: [] };
+      },
+    };
+    const activity = (trackActivityInjectable as any).instantiate({ inject: () => () => () => source })(
+      watchKeyOf({ repository: "o/app", branch: "main", intervalMinutes: 60 }),
+    );
+
+    activity.watch();
+    await settle();
+    await vi.advanceTimersByTimeAsync(4 * 60_000);
+
+    expect(runsOfCalls).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(2 * 60_000);
+
+    expect(runsOfCalls).toBe(1);
+    expect(activity.state.recent[0].runs).toHaveLength(1);
   });
 });

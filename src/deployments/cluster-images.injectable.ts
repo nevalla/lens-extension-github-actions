@@ -2,13 +2,15 @@ import { connectClusterInjectionToken } from "@k8slens/cluster-contracts";
 import { getInjectable2 } from "@k8slens/injectable";
 import {
   appsV1,
+  coreV1,
   daemonSetKind,
   deploymentKind,
   kubeResourcesInjectionToken,
+  podKind,
   statefulSetKind,
 } from "@k8slens/kubernetes-contracts";
 import type { Subscribable } from "@k8slens/subscribable";
-import { computed, type IComputedValue, observable, runInAction } from "mobx";
+import { comparer, computed, type IComputedValue, observable, runInAction } from "mobx";
 import {
   type ClusterImages,
   type DeployResource,
@@ -39,7 +41,15 @@ import {
   sourceToolkitV1,
   sourceToolkitV1beta2,
 } from "./flux-kinds";
-import { daemonSetStatusOf, deploymentStatusOf, statefulSetStatusOf, type WorkloadStatus } from "./workload-status";
+import {
+  daemonSetStatusOf,
+  deploymentStatusOf,
+  type PodReadiness,
+  podReadinessOf,
+  statefulSetStatusOf,
+  withSettledAtOfPods,
+  type WorkloadStatus,
+} from "./workload-status";
 
 export type ClusterImagesState =
   | { readonly status: "loading" }
@@ -78,6 +88,7 @@ export const clusterImagesInjectable = getInjectable2({
       const sources = observable.box<
         | {
             workloads: Source<Workload>[];
+            pods: Source<PodReadiness>;
             imageSelections: Source<ImageSelection>;
             deployResources: Source<DeployResource>[];
             imageAutomations: Source<ImageAutomation>;
@@ -262,6 +273,7 @@ export const clusterImagesInjectable = getInjectable2({
             deployments,
             statefulSets,
             daemonSets,
+            pods,
             imageSelections,
             kustomizations,
             helmReleases,
@@ -273,6 +285,7 @@ export const clusterImagesInjectable = getInjectable2({
             follow(kubeResources(deploymentKind, appsV1, clusterId), workloadOf("Deployment", deploymentStatusOf)),
             follow(kubeResources(statefulSetKind, appsV1, clusterId), workloadOf("StatefulSet", statefulSetStatusOf)),
             follow(kubeResources(daemonSetKind, appsV1, clusterId), workloadOf("DaemonSet", daemonSetStatusOf)),
+            follow(kubeResources(podKind, coreV1, clusterId), podReadinessOf),
             // Flux and each of its parts are optional, and served in versions that depend on Flux's.
             followOptional(
               () => follow(kubeResources(imagePolicyKind, imageToolkitV1, clusterId), imageSelectionOf),
@@ -322,6 +335,9 @@ export const clusterImagesInjectable = getInjectable2({
             failure.set(undefined);
             sources.set({
               workloads: [deployments, statefulSets, daemonSets],
+              // Pods change all the time, mostly in what counts for nothing here: only a pod of a StatefulSet
+              // or a DaemonSet becoming Ready, or ceasing to be, reads the cluster anew.
+              pods: computed(() => pods.get(), { equals: comparer.structural }),
               imageSelections,
               deployResources: [kustomizations, helmReleases, applications],
               imageAutomations,
@@ -354,7 +370,10 @@ export const clusterImagesInjectable = getInjectable2({
         return {
           status: "loaded",
           images: {
-            workloads: loaded.workloads.flatMap((source) => source.get()),
+            workloads: withSettledAtOfPods(
+              loaded.workloads.flatMap((source) => source.get()),
+              loaded.pods.get(),
+            ),
             imageSelections: loaded.imageSelections.get(),
             deployResources: loaded.deployResources.flatMap((source) => source.get()),
             imageAutomations: loaded.imageAutomations.get(),

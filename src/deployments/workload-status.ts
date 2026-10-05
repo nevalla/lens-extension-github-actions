@@ -1,3 +1,5 @@
+import type { Workload } from "./cluster-images";
+
 /** How a workload stands: whether it rolled out, how many of its replicas are ready, and since when it is stable. */
 export interface WorkloadStatus {
   /** Every replica runs the current template. */
@@ -70,4 +72,53 @@ export const daemonSetStatusOf = ({
     ready: status?.numberReady ?? 0,
     desired,
   };
+};
+
+/** One pod of a StatefulSet or a DaemonSet: which it belongs to, and since when it is Ready, if it is. */
+export interface PodReadiness {
+  readonly owner: string;
+  readonly readySince?: string;
+}
+
+export const ownerKeyOf = (kind: string, namespace: string, name: string) => `${kind}/${namespace}/${name}`;
+
+export const podReadinessOf = (pod: {
+  metadata: { namespace: string; ownerReferences?: readonly { kind: string; name: string }[] };
+  status?: { conditions?: readonly { type: string; status: string; lastTransitionTime?: string }[] };
+}): PodReadiness[] => {
+  // A Deployment's pods belong to its ReplicaSets, and a Deployment says itself since when it is stable.
+  const owner = pod.metadata.ownerReferences?.find((each) => each.kind === "StatefulSet" || each.kind === "DaemonSet");
+  const ready = pod.status?.conditions?.find((condition) => condition.type === "Ready" && condition.status === "True");
+
+  return owner
+    ? [{ owner: ownerKeyOf(owner.kind, pod.metadata.namespace, owner.name), readySince: ready?.lastTransitionTime }]
+    : [];
+};
+
+/**
+ * Since when a StatefulSet or a DaemonSet is stable, which neither records itself: since the last of its
+ * pods became Ready, as a restart or a replacement makes one again. Nothing while one of them is not Ready.
+ */
+export const settledAtOfPods = (pods: readonly PodReadiness[]) => {
+  const byOwner = new Map<string, string | null>();
+
+  for (const { owner, readySince } of pods) {
+    const latest = byOwner.get(owner);
+
+    if (latest === null) continue;
+    byOwner.set(owner, !readySince ? null : latest && latest > readySince ? latest : readySince);
+  }
+
+  return (owner: string) => byOwner.get(owner) ?? undefined;
+};
+
+/** The workloads, a StatefulSet or a DaemonSet with its time from its pods, as settledAtOfPods tells it. */
+export const withSettledAtOfPods = (workloads: readonly Workload[], pods: readonly PodReadiness[]): Workload[] => {
+  const settledAtOf = settledAtOfPods(pods);
+
+  return workloads.map((workload) =>
+    workload.kind === "Deployment"
+      ? workload
+      : { ...workload, settledAt: settledAtOf(ownerKeyOf(workload.kind, workload.namespace, workload.name)) },
+  );
 };
