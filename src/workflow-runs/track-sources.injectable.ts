@@ -4,7 +4,7 @@ import { isReleasesWatch, tagMatches, type WatchedRepository } from "../watched-
 import { ghInjectable } from "./gh.injectable";
 import { shellQuote } from "./shell-quote";
 import { toVersionRuns, type Version, type VersionRuns } from "./version";
-import { workflowRunJsonFields, workflowRunSchema } from "./workflow-run";
+import { runsOfCommitWith, type WorkflowRun, workflowRunJsonFields, workflowRunSchema } from "./workflow-run";
 
 /** How far back a running service can be placed. */
 export const versionsAsked = 30;
@@ -14,6 +14,8 @@ const releasesAskedForPattern = 100;
 export const versionsWithRuns = 5;
 // Comfortably more than the workflows one commit triggers.
 const runsAskedPerCommit = 30;
+// The repository's latest runs, which the runs of its newest commits are among, for a busy one too.
+const latestRunsAsked = 100;
 
 const commitsJq = `[.[] | {sha, title: (.commit.message | split("\\n")[0]), committedAt: .commit.committer.date, author: (.author.login // .commit.author.name)}]`;
 
@@ -50,14 +52,31 @@ export const trackSourcesInjectable = getInjectable2({
     const gh = di.inject(ghInjectable)();
     const ghJson = async (args: string) => JSON.parse(await gh(args));
 
-    const runsOfCommit = async (repository: string, sha: string) =>
+    const runList = async (repository: string, extraArgs: string, limit: number) =>
       z
         .array(workflowRunSchema)
         .parse(
           await ghJson(
-            `run list --repo ${shellQuote(repository)} --commit ${shellQuote(sha)} --limit ${runsAskedPerCommit} --json ${workflowRunJsonFields}`,
+            `run list --repo ${shellQuote(repository)}${extraArgs} --limit ${limit} --json ${workflowRunJsonFields}`,
           ),
         );
+
+    // Versions rechecked together each ask for the latest runs: they share the one answer while it is coming.
+    const latestInFlight = new Map<string, Promise<WorkflowRun[]>>();
+    const latestRunsOf = (repository: string) => {
+      const kept = latestInFlight.get(repository);
+
+      if (kept) return kept;
+
+      const latest = runList(repository, "", latestRunsAsked).finally(() => latestInFlight.delete(repository));
+
+      latestInFlight.set(repository, latest);
+
+      return latest;
+    };
+
+    const runsOfCommit = async (repository: string, sha: string, latest: readonly WorkflowRun[]) =>
+      runsOfCommitWith(sha, await runList(repository, ` --commit ${shellQuote(sha)}`, runsAskedPerCommit), latest);
 
     // Asked for the id alone, GitHub answers with just that rather than the whole commit and its diff.
     const commitOf = async (repository: string, ref: string) =>
@@ -81,10 +100,16 @@ export const trackSourcesInjectable = getInjectable2({
      * behind by weeks on busy repositories. A run's branch is the tag for a release's runs, and a pull
      * request from another branch may run on the same commit, so only the runs of what is followed count.
      */
-    const runsOf = async (repository: string, ref: string, sha: string, version: Version) =>
+    const runsOf = async (
+      repository: string,
+      ref: string,
+      sha: string,
+      version: Version,
+      latest: readonly WorkflowRun[],
+    ) =>
       toVersionRuns(
         version,
-        (await runsOfCommit(repository, sha)).filter((run) => run.headBranch === ref),
+        (await runsOfCommit(repository, sha, latest)).filter((run) => run.headBranch === ref),
       );
 
     const branchSource = (repository: string, branch: string): TrackSource => {
@@ -109,15 +134,17 @@ export const trackSourcesInjectable = getInjectable2({
         headOf: () => commitOf(repository, branch),
 
         all: async () => {
-          const versions = await latestCommits();
+          const [versions, latest] = await Promise.all([latestCommits(), latestRunsOf(repository)]);
           const recent = await Promise.all(
-            versions.slice(0, versionsWithRuns).map((version) => runsOf(repository, branch, version.id, version)),
+            versions
+              .slice(0, versionsWithRuns)
+              .map((version) => runsOf(repository, branch, version.id, version, latest)),
           );
 
           return { versions, recent };
         },
 
-        runsOf: (version) => runsOf(repository, branch, version.id, version),
+        runsOf: async (version) => runsOf(repository, branch, version.id, version, await latestRunsOf(repository)),
       };
     };
 
@@ -173,10 +200,10 @@ export const trackSourcesInjectable = getInjectable2({
       // A release's own name is usually its tag, so what it says is the message of the commit it points to.
       // Its runs are those its tag started; a repository that builds the commit on its default branch and
       // tags it afterwards, as release-please does, has none, and then the commit's runs there are shown.
-      const releaseRunsOf = async (version: Version) => {
+      const releaseRunsOf = async (version: Version, latest: readonly WorkflowRun[]) => {
         const commit = await taggedCommitOfRelease(version.id);
         const tagged = { ...version, title: commit.title };
-        const runs = await runsOfCommit(repository, commit.sha);
+        const runs = await runsOfCommit(repository, commit.sha, latest);
         const own = runs.filter((run) => run.headBranch === version.id);
 
         if (own.length > 0 || runs.length === 0) return toVersionRuns(tagged, own);
@@ -192,13 +219,15 @@ export const trackSourcesInjectable = getInjectable2({
         headOf: async () => (await latestReleases())[0]?.id,
 
         all: async () => {
-          const versions = await latestReleases();
-          const recent = await Promise.all(versions.slice(0, versionsWithRuns).map(releaseRunsOf));
+          const [versions, latest] = await Promise.all([latestReleases(), latestRunsOf(repository)]);
+          const recent = await Promise.all(
+            versions.slice(0, versionsWithRuns).map((version) => releaseRunsOf(version, latest)),
+          );
 
           return { versions, recent };
         },
 
-        runsOf: releaseRunsOf,
+        runsOf: async (version) => releaseRunsOf(version, await latestRunsOf(repository)),
       };
     };
 

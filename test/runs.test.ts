@@ -4,6 +4,7 @@ import { overallStatusOf, runStatusOf } from "../src/workflow-runs/run-status";
 import { shellQuote } from "../src/workflow-runs/shell-quote";
 import { trackSourcesInjectable } from "../src/workflow-runs/track-sources.injectable";
 import { toVersionRuns } from "../src/workflow-runs/version";
+import { runsOfCommitWith } from "../src/workflow-runs/workflow-run";
 import { commit, run } from "./fixtures";
 
 describe("runStatusOf", () => {
@@ -101,27 +102,54 @@ describe("releases and their runs", () => {
     databaseId: workflowName.length + headBranch.length,
     workflowName,
     headBranch,
+    headSha: sha,
     event: "push",
     status: "completed",
     conclusion,
   });
 
-  const sourceRunning = (runs: object[], defaultBranch = async () => "main\n") => {
+  const sourceRunning = (runs: object[], defaultBranch = async () => "main\n", latest: object[] = runs) => {
+    let latestAsked = 0;
     const gh = async (command: string) => {
+      if (command.includes("run list") && !command.includes("--commit")) {
+        latestAsked++;
+
+        return JSON.stringify(latest);
+      }
       if (command.includes("release list")) return releases;
       if (command.includes("repo view")) return defaultBranch();
+      // Asked by commit or among the latest, the same runs: they are counted once.
       if (command.includes("run list")) return JSON.stringify(runs);
       if (command.includes("/commits/")) return JSON.stringify({ sha, title: "chore(main): release 1.2.0" });
       throw new Error(`unexpected ${command}`);
     };
 
-    return (trackSourcesInjectable as any).instantiate({ inject: () => () => gh })()({
+    const source = (trackSourcesInjectable as any).instantiate({ inject: () => () => gh })()({
       repository: "o/app",
       track: "releases",
       branch: "",
       intervalMinutes: 5,
     });
+
+    return Object.assign(source, { latestAsked: () => latestAsked });
   };
+
+  it("shows runs that asking by commit misses yet, from the repository's latest runs", async () => {
+    const source = sourceRunning([], undefined, [run("release", "v1.2.0")]);
+    const { recent } = await source.all();
+
+    expect(recent[0].runs.map((each: { workflowName: string }) => each.workflowName)).toEqual(["release"]);
+  });
+
+  it("asks once for the latest runs when versions are rechecked together", async () => {
+    const source = sourceRunning([run("release", "v1.2.0")]);
+    const { versions } = await source.all();
+    const before = source.latestAsked();
+
+    await Promise.all([source.runsOf(versions[0]), source.runsOf(versions[0])]);
+
+    expect(source.latestAsked() - before).toBe(1);
+  });
 
   it("shows a release's own runs when its tag started some", async () => {
     const { recent } = await sourceRunning([run("release", "v1.2.0"), run("ci", "main")]).all();
@@ -169,5 +197,20 @@ describe("releases and their runs", () => {
 
     expect(recent[0].runs).toEqual([]);
     expect(recent[0].runsOn).toBeUndefined();
+  });
+});
+
+describe("runsOfCommitWith", () => {
+  const sha = "a".repeat(40);
+  const of = (id: number, headSha = sha) => ({ ...run("ci", "completed", "success", id), headSha });
+
+  it("adds the commit's runs among the latest, which asking by commit can miss for a while", () => {
+    expect(runsOfCommitWith(sha, [], [of(9), of(8, "b".repeat(40)), of(7)]).map((each) => each.databaseId)).toEqual([
+      9, 7,
+    ]);
+  });
+
+  it("counts a run both answers have once, newest first", () => {
+    expect(runsOfCommitWith(sha, [of(3), of(1)], [of(5), of(3)]).map((each) => each.databaseId)).toEqual([5, 3, 1]);
   });
 });
