@@ -11,6 +11,8 @@ export const liveCheckSeconds = 15;
 const idleHeadCheckSeconds = 60;
 /** A version this young with no runs yet is expected to start some. */
 const awaitingRunsMinutes = 10;
+/** How often a version GitHub said has no runs is asked again, between full checks: the answer may have been wrong. */
+const noRunsRecheckMinutes = 5;
 
 export type TrackActivityState =
   | { readonly status: "loading" }
@@ -55,6 +57,7 @@ export const trackActivityInjectable = getInjectable2({
       let timer: ReturnType<typeof setTimeout> | undefined;
       let checking: Promise<void> | undefined;
       let lastFullCheck = 0;
+      let lastNoRunsCheck = 0;
 
       const loaded = () => {
         const current = state.get();
@@ -83,7 +86,7 @@ export const trackActivityInjectable = getInjectable2({
       const checkAll = async () => {
         const { versions, recent } = await source.all();
 
-        lastFullCheck = Date.now();
+        lastFullCheck = lastNoRunsCheck = Date.now();
         set(recent, versions);
       };
 
@@ -95,9 +98,15 @@ export const trackActivityInjectable = getInjectable2({
         if ((await source.headOf()) !== previous.versions[0]?.id) return checkAll();
 
         const now = Date.now();
+        const noRunsDue = now - lastNoRunsCheck >= noRunsRecheckMinutes * 60_000;
+        const hasNoRuns = (each: VersionRuns) => each.runs.length === 0 && each.otherRuns.length === 0;
         const recent = await Promise.all(
-          previous.recent.map((each) => (isUnfinished(each, now) ? source.runsOf(each.version) : each)),
+          previous.recent.map((each) =>
+            isUnfinished(each, now) || (noRunsDue && hasNoRuns(each)) ? source.runsOf(each.version) : each,
+          ),
         );
+
+        if (noRunsDue) lastNoRunsCheck = now;
 
         set(recent, previous.versions);
       };

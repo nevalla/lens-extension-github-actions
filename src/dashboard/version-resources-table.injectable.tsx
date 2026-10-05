@@ -55,9 +55,11 @@ const stateColors: Record<VersionService["state"], "success" | "primary" | "noti
 };
 
 const NameCell = ({ row }: CellProps) => (
-  <DetailsLink clusterId={row.clusterId} resource={row.resource}>
-    {row.name}
-  </DetailsLink>
+  <Span $tooltip={`${row.resource.kind} ${row.namespace}/${row.resource.name}`}>
+    <DetailsLink clusterId={row.clusterId} resource={row.resource}>
+      {row.name}
+    </DetailsLink>
+  </Span>
 );
 
 const NamespaceCell = ({ row }: CellProps) => <Span>{row.namespace}</Span>;
@@ -71,7 +73,8 @@ const PodsCell = ({ row }: CellProps) =>
     <Span $color="textMuted">—</Span>
   );
 
-// A rollout, a scale or a replica coming back each start it again; only a Deployment records it.
+// A rollout, a scale or a replica coming back each start it again: a Deployment records it, and for a
+// StatefulSet or a DaemonSet it is when the last of its pods became Ready.
 const StableForCell = ({ row }: CellProps) =>
   row.settledAt ? (
     <Span $tooltip={`Settled ${new Date(row.settledAt).toLocaleString()}`}>{formatAge(row.settledAt)}</Span>

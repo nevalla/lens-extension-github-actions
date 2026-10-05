@@ -2,6 +2,11 @@
 
 What changed in each version of this extension, newest first.
 
+## 0.3.0
+
+- **Stable for** shows for StatefulSets and DaemonSets too, such as Keycloak's: since the last of their pods became Ready. Hovering a name tells the workload's kind.
+- A commit or release GitHub said has no workflow runs is asked again every 5 minutes, so a wrong answer no longer shows "—" until the next full check.
+
 ## 0.2.0
 
 - The details panel of a commit or release lists what of the cluster runs it as Lens lists workloads: each workload with its namespace, ready pods, how long it has been stable and its status, and the Flux or Argo CD resource that deploys it, with its chart version; and the Kustomizations and Argo CD Applications applying it.
