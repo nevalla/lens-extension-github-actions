@@ -4,6 +4,9 @@ What changed in each version of this extension, newest first.
 
 ## 0.3.0
 
+- A new commit's workflow runs show as soon as they start: GitHub's answer for a commit can miss them for a while, so they are also taken from the repository's latest runs.
+- A workflow, job or step in progress shows a turning ring, as on GitHub.
+- A Kustomization or HelmRelease waiting for one it depends on shows as applying, not failing, and does not notify. It fails only when what it waits for fails to apply or is not found, which it names.
 - **Stable for** shows for StatefulSets and DaemonSets too, such as Keycloak's: since the last of their pods became Ready. Hovering a name tells the workload's kind.
 - A commit or release GitHub said has no workflow runs is asked again every 5 minutes, so a wrong answer no longer shows "—" until the next full check.
 
