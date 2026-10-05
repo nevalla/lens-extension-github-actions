@@ -7,7 +7,7 @@ export interface RunStatus {
   readonly severity: number;
 }
 
-const inProgress: RunStatus = { label: "In progress", color: "primary", severity: 4 };
+export const inProgress: RunStatus = { label: "In progress", color: "primary", severity: 4 };
 const queued: RunStatus = { label: "Queued", color: "primary", severity: 4 };
 const failed: RunStatus = { label: "Failed", color: "critical", severity: 3 };
 const timedOut: RunStatus = { label: "Timed out", color: "critical", severity: 3 };
