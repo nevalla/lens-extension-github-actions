@@ -5,6 +5,7 @@ What changed in each version of this extension, newest first.
 ## 0.4.0
 
 - CronJobs count as running the version their image is of, as Deployments do: listed as scheduled, or suspended, whether or not a Job of theirs ran since. Hovering the status tells when a Job of it last succeeded.
+- A tooltip open on a dashboard table stays open while a check brings nothing new, instead of closing every 15 seconds or every minute.
 
 ## 0.3.0
 
