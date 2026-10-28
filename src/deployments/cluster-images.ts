@@ -9,11 +9,11 @@ export interface OwnerRef {
 }
 
 export interface Workload {
-  readonly kind: "Deployment" | "StatefulSet" | "DaemonSet";
+  readonly kind: "Deployment" | "StatefulSet" | "DaemonSet" | "CronJob";
   readonly namespace: string;
   readonly name: string;
   readonly images: readonly string[];
-  /** Every replica runs the current template. */
+  /** Every replica runs the current template; a CronJob always does, its next Job being made from it. */
   readonly rolledOut: boolean;
   /** How many of its replicas are ready, of how many it wants. */
   readonly replicas?: { readonly ready: number; readonly desired: number };
@@ -22,7 +22,14 @@ export interface Workload {
    * or after a scale or a replica coming back since, whichever came last.
    */
   readonly settledAt?: string;
+  /** For a CronJob, which has no replicas: whether it is suspended, and when a Job of it last succeeded. */
+  readonly schedule?: CronJobSchedule;
   readonly owner?: OwnerRef;
+}
+
+export interface CronJobSchedule {
+  readonly suspended: boolean;
+  readonly lastSucceededAt?: string;
 }
 
 export interface ImageSelection {

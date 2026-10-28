@@ -59,4 +59,17 @@ describe("resourcesOfVersion", () => {
       ["apps", "Kustomization", "Kustomization applied", undefined, undefined],
     ]);
   });
+
+  it("says a CronJob running the version is scheduled, or suspended, with no pods", () => {
+    const cleanup = workload("cleanup", "app:1", { kind: "CronJob", schedule: { suspended: false } });
+    const paused = workload("paused", "app:1", { kind: "CronJob", schedule: { suspended: true } });
+    const rows = resourcesOfVersion([
+      { name: "app", state: "running", service: service({ workloads: [cleanup, paused] }) },
+    ]);
+
+    expect(rows.map((row) => [row.id, row.label, row.pods])).toEqual([
+      ["CronJob/apps/cleanup", "scheduled", undefined],
+      ["CronJob/apps/paused", "suspended", undefined],
+    ]);
+  });
 });

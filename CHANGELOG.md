@@ -2,6 +2,10 @@
 
 What changed in each version of this extension, newest first.
 
+## 0.4.0
+
+- CronJobs count as running the version their image is of, as Deployments do: listed as scheduled, or suspended, whether or not a Job of theirs ran since. Hovering the status tells when a Job of it last succeeded.
+
 ## 0.3.0
 
 - A new commit's workflow runs show as soon as they start: GitHub's answer for a commit can miss them for a while, so they are also taken from the repository's latest runs.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cronJobScheduleOf,
   daemonSetStatusOf,
   deploymentStatusOf,
   podReadinessOf,
@@ -59,6 +60,16 @@ describe("statefulSetStatusOf and daemonSetStatusOf", () => {
   });
 });
 
+describe("cronJobScheduleOf", () => {
+  it("takes when a Job of it last succeeded, and whether it is suspended", () => {
+    expect(cronJobScheduleOf({ spec: {}, status: { lastSuccessfulTime: "2026-10-03T08:00:00Z" } })).toEqual({
+      suspended: false,
+      lastSucceededAt: "2026-10-03T08:00:00Z",
+    });
+    expect(cronJobScheduleOf({ spec: { suspend: true } })).toEqual({ suspended: true, lastSucceededAt: undefined });
+  });
+});
+
 describe("withSettledAtOfPods", () => {
   const pod = (owner: string, name: string, readySince?: string) => ({
     metadata: { namespace: "auth", ownerReferences: [{ kind: owner, name }] },
@@ -93,5 +104,11 @@ describe("withSettledAtOfPods", () => {
       undefined,
       "2026-10-01T00:00:00Z",
     ]);
+  });
+
+  it("leaves a CronJob alone", () => {
+    const cleanup = workload("cleanup", "api:1", { kind: "CronJob", schedule: { suspended: false } });
+
+    expect(withSettledAtOfPods([cleanup], [])).toEqual([cleanup]);
   });
 });

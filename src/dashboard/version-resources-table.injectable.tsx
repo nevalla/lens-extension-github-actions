@@ -82,7 +82,21 @@ const StableForCell = ({ row }: CellProps) =>
     <Span $color="textMuted">—</Span>
   );
 
-const StatusCell = ({ row }: CellProps) => <Span $color={stateColors[row.state]}>{row.label}</Span>;
+const lastSucceededOf = (row: Row) => {
+  const schedule = "schedule" in row.resource ? row.resource.schedule : undefined;
+
+  if (!schedule) return undefined;
+
+  return schedule.lastSucceededAt
+    ? `A Job last succeeded ${new Date(schedule.lastSucceededAt).toLocaleString()}`
+    : "No Job of it has succeeded yet";
+};
+
+const StatusCell = ({ row }: CellProps) => (
+  <Span $color={stateColors[row.state]} $tooltip={lastSucceededOf(row)}>
+    {row.label}
+  </Span>
+);
 
 const DeployedByCell = ({ row }: CellProps) => (
   <DeployerLink clusterId={row.clusterId} deployer={row.deployer} chart={row.chart} />
