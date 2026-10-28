@@ -1,6 +1,6 @@
 import { getSubscribableInjectableBunch } from "@k8slens/subscribable";
 import { ColumnHeader } from "@k8slens/table-components";
-import { reaction } from "mobx";
+import { comparer, reaction } from "mobx";
 import { watchOnClusterInjectable } from "./watch-on-cluster.injectable";
 
 /** What every table of a watch is rendered for: the cluster, and the watch as its key. */
@@ -30,7 +30,8 @@ export const getWatchRowsBunch = <Row, Params extends [...WatchTableParams, ...s
               const stopPushing = reaction(
                 () => rowsOf(watchState, ...params),
                 (rows) => rows && push(rows),
-                { fireImmediately: true },
+                // A poll that brings the same rows pushes nothing: new rows would close a tooltip open on the table.
+                { fireImmediately: true, equals: comparer.structural },
               );
 
               return () => {

@@ -9,7 +9,7 @@ import type { VersionService } from "../deployments/version-services";
 import { resourcesOfVersion, type VersionResource } from "../deployments/version-resources";
 import { DeployerLink } from "./deployer-link";
 import { DetailsLink } from "./details-link";
-import { formatAge } from "./format-time-ago";
+import { formatAge, useNow } from "./format-time-ago";
 import { columnHeader, getWatchRowsBunch, type WatchTableParams } from "./watch-table";
 
 /** What the cluster runs of one version: the table in its details panel. */
@@ -75,12 +75,15 @@ const PodsCell = ({ row }: CellProps) =>
 
 // A rollout, a scale or a replica coming back each start it again: a Deployment records it, and for a
 // StatefulSet or a DaemonSet it is when the last of its pods became Ready.
-const StableForCell = ({ row }: CellProps) =>
-  row.settledAt ? (
-    <Span $tooltip={`Settled ${new Date(row.settledAt).toLocaleString()}`}>{formatAge(row.settledAt)}</Span>
+const StableForCell = ({ row }: CellProps) => {
+  const now = useNow();
+
+  return row.settledAt ? (
+    <Span $tooltip={`Settled ${new Date(row.settledAt).toLocaleString()}`}>{formatAge(row.settledAt, now)}</Span>
   ) : (
     <Span $color="textMuted">—</Span>
   );
+};
 
 const lastSucceededOf = (row: Row) => {
   const schedule = "schedule" in row.resource ? row.resource.schedule : undefined;
