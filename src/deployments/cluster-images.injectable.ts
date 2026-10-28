@@ -2,7 +2,9 @@ import { connectClusterInjectionToken } from "@k8slens/cluster-contracts";
 import { getInjectable2 } from "@k8slens/injectable";
 import {
   appsV1,
+  batchV1,
   coreV1,
+  cronJobKind,
   daemonSetKind,
   deploymentKind,
   kubeResourcesInjectionToken,
@@ -43,6 +45,7 @@ import {
   sourceToolkitV1beta2,
 } from "./flux-kinds";
 import {
+  cronJobScheduleOf,
   daemonSetStatusOf,
   deploymentStatusOf,
   type PodReadiness,
@@ -166,6 +169,31 @@ export const clusterImagesInjectable = getInjectable2({
           ];
         };
 
+      const cronJobOf = (cronJob: {
+        metadata: {
+          namespace: string;
+          name: string;
+          labels?: Record<string, string>;
+          annotations?: Record<string, string>;
+        };
+        spec: { suspend?: boolean; jobTemplate?: { spec?: { template?: Template } } };
+        status?: { lastSuccessfulTime?: string };
+      }): Workload[] => {
+        const template = cronJob.spec.jobTemplate?.spec?.template;
+
+        return [
+          {
+            kind: "CronJob",
+            namespace: cronJob.metadata.namespace,
+            name: cronJob.metadata.name,
+            images: imagesOf(template),
+            rolledOut: true,
+            schedule: cronJobScheduleOf(cronJob),
+            owner: ownerOfWorkload(cronJob.metadata, template?.metadata?.labels),
+          },
+        ];
+      };
+
       const fluxResourceOf =
         (kind: DeployResource["kind"], apiVersion: DeployResource["apiVersion"]) =>
         (resource: {
@@ -283,6 +311,7 @@ export const clusterImagesInjectable = getInjectable2({
             deployments,
             statefulSets,
             daemonSets,
+            cronJobs,
             pods,
             imageSelections,
             kustomizations,
@@ -295,6 +324,8 @@ export const clusterImagesInjectable = getInjectable2({
             follow(kubeResources(deploymentKind, appsV1, clusterId), workloadOf("Deployment", deploymentStatusOf)),
             follow(kubeResources(statefulSetKind, appsV1, clusterId), workloadOf("StatefulSet", statefulSetStatusOf)),
             follow(kubeResources(daemonSetKind, appsV1, clusterId), workloadOf("DaemonSet", daemonSetStatusOf)),
+            // CronJobs are an extra: a cluster that does not let them be read still shows the rest.
+            followOptional(() => follow(kubeResources(cronJobKind, batchV1, clusterId), cronJobOf)),
             follow(kubeResources(podKind, coreV1, clusterId), podReadinessOf),
             // Flux and each of its parts are optional, and served in versions that depend on Flux's.
             followOptional(
@@ -344,7 +375,7 @@ export const clusterImagesInjectable = getInjectable2({
           runInAction(() => {
             failure.set(undefined);
             sources.set({
-              workloads: [deployments, statefulSets, daemonSets],
+              workloads: [deployments, statefulSets, daemonSets, cronJobs],
               // Pods change all the time, mostly in what counts for nothing here: only a pod of a StatefulSet
               // or a DaemonSet becoming Ready, or ceasing to be, reads the cluster anew.
               pods: computed(() => pods.get(), { equals: comparer.structural }),

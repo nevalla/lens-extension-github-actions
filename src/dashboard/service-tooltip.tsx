@@ -29,6 +29,7 @@ export const ServiceTooltip = ({ service }: { service: ServiceRow }) => (
         <Span key={`${workload.kind}/${workload.namespace}/${workload.name}`}>
           {workload.kind} {workload.namespace}/{workload.name}
           {workload.rolledOut ? "" : " (rolling out)"}
+          {workload.schedule?.suspended ? " (suspended)" : ""}
         </Span>
       ))}
       {service.pickedUp?.imageSelections.map((selection) => (

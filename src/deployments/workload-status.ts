@@ -1,4 +1,4 @@
-import type { Workload } from "./cluster-images";
+import type { CronJobSchedule, Workload } from "./cluster-images";
 
 /** How a workload stands: whether it rolled out, how many of its replicas are ready, and since when it is stable. */
 export interface WorkloadStatus {
@@ -74,6 +74,18 @@ export const daemonSetStatusOf = ({
   };
 };
 
+/**
+ * How a CronJob stands. It has nothing to roll out: once its template has an image, every Job it makes
+ * from then on runs it, so it is deployed as soon as it is applied, whether or not a Job of it ran since.
+ */
+export const cronJobScheduleOf = (cronJob: {
+  spec: { suspend?: boolean };
+  status?: { lastSuccessfulTime?: string };
+}): CronJobSchedule => ({
+  suspended: cronJob.spec.suspend ?? false,
+  lastSucceededAt: cronJob.status?.lastSuccessfulTime,
+});
+
 /** One pod of a StatefulSet or a DaemonSet: which it belongs to, and since when it is Ready, if it is. */
 export interface PodReadiness {
   readonly owner: string;
@@ -117,7 +129,7 @@ export const withSettledAtOfPods = (workloads: readonly Workload[], pods: readon
   const settledAtOf = settledAtOfPods(pods);
 
   return workloads.map((workload) =>
-    workload.kind === "Deployment"
+    workload.kind === "Deployment" || workload.kind === "CronJob"
       ? workload
       : { ...workload, settledAt: settledAtOf(ownerKeyOf(workload.kind, workload.namespace, workload.name)) },
   );

@@ -1,13 +1,25 @@
 import { navigateToKubeResourceDetailsInjectionToken } from "@k8slens/details-panel-contracts";
 import { getInjectable2 } from "@k8slens/injectable";
-import { appsV1, daemonSetKind, deploymentKind, statefulSetKind } from "@k8slens/kubernetes-contracts";
+import {
+  appsV1,
+  batchV1,
+  cronJobKind,
+  daemonSetKind,
+  deploymentKind,
+  statefulSetKind,
+} from "@k8slens/kubernetes-contracts";
 import { isNavigationSupersededError } from "@k8slens/navigation-contracts";
 import { showErrorNotificationInjectionToken } from "@k8slens/notifications-contracts";
 import type { DeployResource, Workload } from "./cluster-images";
 import { applicationKind } from "./argo-kinds";
 import { helmReleaseKind, kustomizationKind } from "./flux-kinds";
 
-const workloadKinds = { Deployment: deploymentKind, StatefulSet: statefulSetKind, DaemonSet: daemonSetKind } as const;
+const workloadKinds = {
+  Deployment: { kind: deploymentKind, apiVersion: appsV1 },
+  StatefulSet: { kind: statefulSetKind, apiVersion: appsV1 },
+  DaemonSet: { kind: daemonSetKind, apiVersion: appsV1 },
+  CronJob: { kind: cronJobKind, apiVersion: batchV1 },
+} as const;
 const deployerKinds = {
   Kustomization: kustomizationKind,
   HelmRelease: helmReleaseKind,
@@ -29,7 +41,7 @@ export const openResourceDetailsInjectable = getInjectable2({
           clusterId,
           ...("apiVersion" in resource
             ? { kind: deployerKinds[resource.kind], apiVersion: resource.apiVersion }
-            : { kind: workloadKinds[resource.kind], apiVersion: appsV1 }),
+            : workloadKinds[resource.kind]),
           ref: { namespace: resource.namespace, name: resource.name },
         });
       } catch (error) {

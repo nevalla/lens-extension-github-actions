@@ -27,6 +27,10 @@ export interface VersionResource {
 
 const idOf = (resource: Workload | DeployResource) => `${resource.kind}/${resource.namespace}/${resource.name}`;
 
+// A CronJob running a version runs nothing between its Jobs: it is scheduled to, unless it is suspended.
+const labelOf = (workload: Workload, state: VersionService["state"], label: string) =>
+  workload.schedule && state === "running" ? (workload.schedule.suspended ? "suspended" : "scheduled") : label;
+
 export const resourcesOfVersion = (
   services: readonly VersionService[] = [],
   syncs: readonly VersionSync[] = [],
@@ -53,7 +57,7 @@ export const resourcesOfVersion = (
 
     return service.workloads.map((workload) => ({
       state,
-      label,
+      label: labelOf(workload, state, label),
       deployer: service.deployer,
       chart: service.chart?.applied,
       id: idOf(workload),
