@@ -11,7 +11,7 @@ import { entriesOfVersion, type VersionEntry } from "../deployments/version-entr
 import { isReleasesWatch, watchOfKey } from "../watched-repositories/watched-repository";
 import { overallStatusOf } from "../workflow-runs/run-status";
 import { CommitRunsTooltip } from "./commit-runs-tooltip";
-import { formatAge } from "./format-time-ago";
+import { formatAge, useNow } from "./format-time-ago";
 import { RunStatusIcon } from "./run-status-icon";
 import { ServiceTooltip } from "./service-tooltip";
 import { EntryDot } from "./entry-dot";
@@ -149,7 +149,7 @@ const InClusterCell = ({ row }: CellProps) => {
   );
 };
 
-const AgeCell = ({ row }: CellProps) => <Span>{formatAge(row.version.at)}</Span>;
+const AgeCell = ({ row }: CellProps) => <Span>{formatAge(row.version.at, useNow())}</Span>;
 
 const columns = [
   ["version", VersionCell, columnHeader("Version")],
